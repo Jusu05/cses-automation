@@ -3,11 +3,11 @@ from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
-from configparser import ConfigParser
-from pathlib import Path
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
-import os
+from configparser import ConfigParser
+from pathlib import Path
+import argparse, os
 
 class IniParser:
     def __init__(self, file: str | Path) -> None:
@@ -257,3 +257,134 @@ class CsesConnection:
         solution.click()
         result = self.driver.find_element(By.CSS_SELECTOR, "body > div.skeleton > div.content-wrapper > div.content > table > tbody > tr:nth-child(6) > td:nth-child(2) > span")
         return result.text
+
+
+class App:
+    def __init__(self):
+        self.parser = argparse.ArgumentParser(description="This is comand line tool for download and subting for mooc cses exesises")
+        self.settings = Settings(Path("."))
+
+    def main(self):
+        self.build_arguments()
+        self.parse_arquments()
+
+    def build_arguments(self):
+        subparsers = self.parser.add_subparsers(help="help for subcommand", dest="subcommand")
+
+        self.parser.add_argument("submit", help="file name file that will be submited")
+        subparsers.add_argument("download", help="dowload all not yet download excises")
+
+        settings_parser = subparsers.add_parser("settings", help="settings for program")
+        settings_parser.add_argument("--webdriver", type=str, help="set path to browser webdriver")
+        settings_parser.add_argument("--url", type=str, help="set url to cses website")
+        settings_parser.add_argument("--dir", type=str, help="set dirrectory where files will be downloaded")
+        settings_parser.add_argument("--username", type=str, help="set mooc username")
+        settings_parser.add_argument("--password", type=str, help="set mooc password")
+
+    def parse_arquments(self):
+        args = self.parser.parse_args(["submit", "download", "settings"])
+
+        if args.submit:
+            self.handle_submit(args.submit)
+
+        if args.subcommand == "download":
+            self.handle_download(args.download)
+
+        if args.subcommand == "settings":
+            self.handle_settings(args)
+
+    def handle_settings(self, args):
+        if args.webdriver:
+            try:
+                self.handle_settings.set_webdriver_path(args.webdriver)
+            except ValueError:
+                print("only supported driver is firefox geckodriver")
+            except FileNotFoundError:
+                print("You need to download firefox's webdriver and it needs to in path")
+                print("It can be here https://github.com/mozilla/geckodriver/releases")
+            except:
+                pass
+
+        if args.url:
+            try:
+                self.settings.set_cses_url(args.url)
+            except ValueError as e:
+                print(e.args[0])
+            except:
+                pass
+
+        if args.dir:
+            try:
+                self.settings.set_cses_url(args.dir)
+            except FileNotFoundError as e:
+                print(e.args[0])
+            except:
+                pass
+
+        if args.username:
+            try:
+                self.settings.set_username(args.username)
+            except:
+                pass
+
+        if args.password:
+            try:
+                self.settings.set_password(args.password)
+            except:
+                pass
+
+    def handle_download(self):
+        try:
+            if not hasattr(self, "cses_connection"):
+                self.cses_connection = CsesConnection(self.settings)
+
+            tasks = self.cses_connection.get_task_list()
+            dir = self.settings.get_working_dir()
+            downloaded_tasks = set(os.listdir(dir))
+            tasks = [task for task in tasks if task[1] not in downloaded_tasks]
+            self.cses_connection.load_task(tasks)
+
+        except ValueError as e:
+            match e.args[0]:
+                case "webdriver path is not spefied":
+                    print("Webdriver path need to spefied by settings --webdriver")
+                case "working directory is not defined":
+                    print("Working dir need to spefied by settings --dir")
+                case "url is not spefied":
+                    print("Url need to spefied by settings --url")
+                case "username is not spefied":
+                    print("Username need to spefied by settings --username")
+                case "password is not spefied":
+                    print("Password need to spefied by settings --password")
+
+    def handle_submit(self, file: str):
+        try:
+            if not hasattr(self, "cses_connection"):
+                self.cses_connection = CsesConnection(self.settings)
+
+            tasks = self.cses_connection.get_task_list()
+
+            if len(tasks) == 0:
+                return
+
+            if file not in [task[1] for task in tasks]:
+                return
+
+            self.cses_connection.submit_task(file, tasks)
+
+        except ValueError as e:
+            match e.args[0]:
+                case "webdriver path is not spefied":
+                    print("Webdriver path need to spefied by settings --webdriver")
+                case "working directory is not defined":
+                    print("Working dir need to spefied by settings --dir")
+                case "url is not spefied":
+                    print("Url need to spefied by settings --url")
+                case "username is not spefied":
+                    print("Username need to spefied by settings --username")
+                case "password is not spefied":
+                    print("Password need to spefied by settings --password")
+
+
+app = App()
+app.main()
