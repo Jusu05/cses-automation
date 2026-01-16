@@ -26,42 +26,66 @@ class IniParser:
         if not isinstance(file, Path):
             raise TypeError(f"teidosto ei ole merkkijono tai polku vaan {file}")
 
-        if not file.is_file():
-            raise ValueError("annettu tiedosto ei ole tiedosto")
-
         if file.suffix != ".ini":
             raise ValueError("tiedosto ei ole ini tiedosto")
 
+        if not file.is_file():
+            with open(file, "w") as f:
+                pass
+
         self._file = file
 
-    def edit(self, class_: str, variable: str, value: str):
-        self._parser.set(class_, variable, value)
+    def edit(self, section: str, option: str, value: str):
+        self._parser.set(section, option, value)
 
-        with open(self._file, 'w', encoding="utf-8") as file:
+        with open(self._file, "w", encoding="utf-8") as file:
             self._parser.write(file)
 
-    def read(self, class_: str, variable: str):
+    def read(self, section: str, option: str):
         self._parser.read(self._file, encoding="utf-8")
-        value = self._parser.get(class_, variable)
+        value = self._parser.get(section, option, fallback=None)
 
         return value
 
 
 class Settings():
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path):
         self._parser = IniParser(path.joinpath("settings.ini"))
 
     def get_webdriver_path(self) -> str:
-        return self._parser.read("general", "webdriver")
+        driver = self._parser.read("general", "webdriver")
+
+        if not driver:
+            raise ValueError("webdriver path is not spefied")
+
+        return driver
 
     def get_cses_url(self) -> str:
-        return self._parser.read("general", "cses_url")
+        url = self._parser.read("general", "cses_url")
+
+        if not url:
+            raise ValueError("url is not spefied")
+
+        return url
 
     def get_username_and_password(self) -> tuple[str, str]:
-        return self._parser.read("user", "username"), self._parser.read("password", "username")
+        username = self._parser.read("user", "username")
+        password = self._parser.read("user", "password")
+
+        if not username:
+            raise ValueError("username is not spefied")
+        if not password:
+            raise ValueError("password is not spefied")
+
+        return username, password
 
     def get_working_dir(self) -> str:
-        return self._parser.read("system", "working_dir")
+        path = self._parser.read("system", "working_dir")
+
+        if not path:
+            raise ValueError("working directory is not defined")
+
+        return path
 
     def set_webdriver_path(self, driver: str):
         if not isinstance(driver, str):
@@ -91,14 +115,17 @@ class Settings():
 
         return self._parser.edit("general", "cses_url")
 
-    def set_username_and_password(self, username, password) -> tuple[str, str]:
-        if not isinstance(username, str):
-            raise TypeError(f"username is not str it's {type(username)}")
+    def set_password(self, password):
         if not isinstance(password, str):
             raise TypeError(f"url is not str it's {type(password)}")
 
-        self._parser.edit("user", "username", username)
         self._parser.edit("user", "password", password)
+
+    def set_username(self, username) -> tuple[str, str]:
+        if not isinstance(username, str):
+            raise TypeError(f"username is not str it's {type(username)}")
+
+        self._parser.edit("user", "username", username)
 
     def set_working_dir(self, dir: str | Path) -> str:
         if isinstance(dir, str):
@@ -109,23 +136,26 @@ class Settings():
             raise TypeError(f"dir is not str it's {type(dir)}")
 
         if dir.exists():
-            FileNotFoundError("folder does not exis")
+            FileNotFoundError("given path does not exist")
 
         if dir.is_dir():
-            FileNotFoundError("dir does is not fil")
+            FileNotFoundError("given path is not directory")
 
         return self._parser.edit("system", "working_dir", str(dir))
 
 
 class CsesConnection:
-    def __init__(self, url: str):
-        self._settings = Settings()
+    def __init__(self, settings: Settings):
+        self._settings = settings
         options = Options()
         options.add_argument("--headless")
-        service = Service(self._settings.get_webdriver_path())
+
+        driver = self._settings.get_webdriver_path()
+        service = Service(driver)
         self.driver = webdriver.Firefox(options=options, service=service)
-        self.driver.get(f"{url}/list/")
-        self.url = url
+
+        self.url = self._settings.get_cses_url()
+        self.driver.get(f"{self.url}/list/")
 
     def login(self):
         accaunt = self.driver.find_element(By.CSS_SELECTOR, "body > div.header > div > div > a.account")
@@ -183,7 +213,7 @@ class CsesConnection:
                 file.writelines(text)
 
     def submit_task(self, task_name, tasks):
-        task = self.get_task(task_name, tasks)
+        task = self._get_task(task_name, tasks)
         if not task:
             return
 
@@ -209,7 +239,7 @@ class CsesConnection:
         submit = self.driver.find_element(By.CSS_SELECTOR, ".content > form:nth-child(1) > p:nth-child(6) > input:nth-child(1)")
         submit.click()
 
-    def get_task(self, task_name, tasks):
+    def _get_task(self, task_name, tasks):
         task = list(filter(lambda task: task[0]==task_name, tasks))
         if len(task) == 0:
             task = list(filter(lambda task: task[1]==task_name, tasks))
@@ -218,7 +248,7 @@ class CsesConnection:
         return task[0]
 
     def task_solution_result(self, task_name, tasks):
-        task = self.get_task(task_name, tasks)
+        task = self._get_task(task_name, tasks)
         if not task:
             return
 
