@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 from configparser import ConfigParser
 from pathlib import Path
-import argparse, os
+import argparse, os, sys
 
 class IniParser:
     def __init__(self, file: str | Path) -> None:
@@ -262,76 +262,95 @@ class CsesConnection:
 class App:
     def __init__(self):
         self.parser = argparse.ArgumentParser(description="This is comand line tool for download and subting for mooc cses exesises")
-        self.settings = Settings(Path("."))
+        self.settings = Settings(Path("./"))
 
     def main(self):
-        self.build_arguments()
-        self.parse_arquments()
+        args = sys.argv
+        args = [arg for arg in args if not arg.endswith(".py")]
+        if args[0] == "--help" or  args[0] == "-h":
+            self.help(submit=True, download=True, settings=True) 
+            return
+        
+        if args[0] == "submit":
+            if args[1] == "--help" or args[1] == "-h":
+                self.help(submit=True)
+                return
+            
+            self.handle_submit(args[1])
+        
+        if args[0] == "download":
+            if args[1] == "--help" or args[1] == "-h":
+                self.help(download=True)
+                return
+            
+            self.handle_download()
 
-    def build_arguments(self):
-        subparsers = self.parser.add_subparsers(help="help for subcommand", dest="subcommand")
-
-        self.parser.add_argument("submit", help="file name file that will be submited")
-        subparsers.add_argument("download", help="dowload all not yet download excises")
-
-        settings_parser = subparsers.add_parser("settings", help="settings for program")
-        settings_parser.add_argument("--webdriver", type=str, help="set path to browser webdriver")
-        settings_parser.add_argument("--url", type=str, help="set url to cses website")
-        settings_parser.add_argument("--dir", type=str, help="set dirrectory where files will be downloaded")
-        settings_parser.add_argument("--username", type=str, help="set mooc username")
-        settings_parser.add_argument("--password", type=str, help="set mooc password")
-
-    def parse_arquments(self):
-        args = self.parser.parse_args(["submit", "download", "settings"])
-
-        if args.submit:
-            self.handle_submit(args.submit)
-
-        if args.subcommand == "download":
-            self.handle_download(args.download)
-
-        if args.subcommand == "settings":
+        if args[0] == "settings":
+            if args[1] == "--help" or args[1] == "-h":
+                self.help(settings=True)
+                return
+            
+            args = args[1:]
             self.handle_settings(args)
 
-    def handle_settings(self, args):
-        if args.webdriver:
-            try:
-                self.handle_settings.set_webdriver_path(args.webdriver)
-            except ValueError:
-                print("only supported driver is firefox geckodriver")
-            except FileNotFoundError:
-                print("You need to download firefox's webdriver and it needs to in path")
-                print("It can be here https://github.com/mozilla/geckodriver/releases")
-            except:
-                pass
 
-        if args.url:
-            try:
-                self.settings.set_cses_url(args.url)
-            except ValueError as e:
-                print(e.args[0])
-            except:
-                pass
+    def help(self,*, submit=False, download=False, settings=False):
+        helptext = ""
+        if submit and download and settings:
+            helptext += "Usage: progam <command>\n\n"
+            helptext += "list of commands:\n"
+        if submit:
+            helptext += "submit <file> - file name that will be submited\n"
+        if download:
+            helptext += "download - downloads all not yet downloaded excises\n"
+        if settings:
+            helptext += "settings <argumets...> - settings for program\n\n"
+            helptext += "    list of argumets\n"
+            helptext += "    --webdriver <driver> - set path to browser webdriver\n"
+            helptext += "    --url <url> - set url to cses website\n"
+            helptext += "    --dir <path> - set dirrectory where files will be downloaded\n"
+            helptext += "    --username <username> - set mooc username\n"
+            helptext += "    --password <password> - set mooc password"
 
-        if args.dir:
-            try:
-                self.settings.set_cses_url(args.dir)
-            except FileNotFoundError as e:
-                print(e.args[0])
-            except:
-                pass
+        print(helptext)
 
-        if args.username:
-            try:
-                self.settings.set_username(args.username)
-            except:
-                pass
-
-        if args.password:
-            try:
-                self.settings.set_password(args.password)
-            except:
-                pass
+    def handle_settings(self, args: list[str]):
+        for i in range(0, len(args)-1, 2):
+            match args[i]:
+                case "--webriver":
+                    try:
+                        self.settings.set_webdriver_path(args[i+1])
+                    except ValueError:
+                        print("only supported driver is firefox geckodriver")
+                    except FileNotFoundError:
+                        print("You need to download firefox's webdriver and it needs to in path")
+                        print("It can be here https://github.com/mozilla/geckodriver/releases")
+                    except:
+                        pass
+                case "--url":
+                    try:
+                        self.settings.set_cses_url(args[i+1])
+                    except ValueError as e:
+                        print(e.args[0])
+                    except:
+                        pass
+                case "--dir":
+                    try:
+                        self.settings.set_cses_url(args[i+1])
+                    except FileNotFoundError as e:
+                        print(e.args[0])
+                    except:
+                        pass
+                case "--username":
+                    try:
+                        self.settings.set_username(args[i+1])
+                    except:
+                        pass
+                case "--password":
+                    try:
+                        self.settings.set_password(args[i+1])
+                    except:
+                        pass
 
     def handle_download(self):
         try:
