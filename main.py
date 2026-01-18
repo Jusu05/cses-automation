@@ -49,8 +49,8 @@ class IniParser:
 
 
 class Settings():
-    def __init__(self, path: Path):
-        self._parser = IniParser(path.joinpath("settings.ini"))
+    def __init__(self, settings_path: Path):
+        self._parser = IniParser(settings_path)
 
     def get_webdriver_path(self) -> str:
         driver = self._parser.read("general", "webdriver")
@@ -260,9 +260,9 @@ class CsesConnection:
 
 
 class App:
-    def __init__(self):
+    def __init__(self, settings_path: Path):
         self.parser = argparse.ArgumentParser(description="This is comand line tool for download and subting for mooc cses exesises")
-        self.settings = Settings(Path("./"))
+        self.settings = Settings(settings_path)
 
     def main(self):
         args = sys.argv
@@ -405,5 +405,5 @@ class App:
                     print("Password need to spefied by settings --password")
 
 
-app = App()
+app = App(Path("./settings.py"))
 app.main()
