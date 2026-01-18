@@ -132,19 +132,20 @@ class Settings():
     def set_username(self, username) -> tuple[str, str]:
         if not isinstance(username, str):
             raise TypeError(f"username is not str it's {type(username)}")
-
         self._parser.edit("user", "username", username)
 
     def set_working_dir(self, dir: str | Path) -> str:
         if isinstance(dir, str):
             dir = Path(dir)
-        elif isinstance(dir, Path):
-            pass
-        else:
+       
+        if not isinstance(dir, Path):
             raise TypeError(f"dir is not str it's {type(dir)}")
 
-        if dir.exists():
-            FileNotFoundError("given path does not exist")
+        if not dir.exists():
+            try:
+                os.mkdir(dir)
+            except:
+                FileNotFoundError("given path does not exist")
 
         if dir.is_dir():
             FileNotFoundError("given path is not directory")
