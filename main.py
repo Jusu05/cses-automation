@@ -5,7 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
-from configparser import ConfigParser
+from configparser import ConfigParser, NoSectionError, NoOptionError
 from pathlib import Path
 import argparse, os, sys
 
@@ -36,7 +36,12 @@ class IniParser:
         self._file = file
 
     def edit(self, section: str, option: str, value: str):
-        self._parser.set(section, option, value)
+        try:
+            self._parser.set(section, option, value)
+        except NoSectionError:
+            self._parser[section] = {option: value}
+        except NoOptionError:
+            self._parser[section] = {option: value}
 
         with open(self._file, "w", encoding="utf-8") as file:
             self._parser.write(file)
@@ -71,7 +76,8 @@ class Settings():
     def get_username_and_password(self) -> tuple[str, str]:
         username = self._parser.read("user", "username")
         password = self._parser.read("user", "password")
-
+        password = bytes.fromhex(password)
+        password = password.decode()
         if not username:
             raise ValueError("username is not spefied")
         if not password:
@@ -119,6 +125,8 @@ class Settings():
         if not isinstance(password, str):
             raise TypeError(f"url is not str it's {type(password)}")
 
+        password = bytes(password)
+        password = password.hex()
         self._parser.edit("user", "password", password)
 
     def set_username(self, username) -> tuple[str, str]:
