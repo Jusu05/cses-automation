@@ -4,8 +4,7 @@ from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse
-from configparser import ConfigParser, NoSectionError, NoOptionError
+from configparser import ConfigParser
 from pathlib import Path
 import argparse, os, sys
 
@@ -95,7 +94,7 @@ class Settings():
         if not isinstance(driver, str):
             raise TypeError(f"driver is not str it's {type(driver)}")
 
-        if not driver.endswith("geckodriver.exe"):
+        if not driver.endswith("geckodriver"):
             raise ValueError("webdriver is not firefoxs geckodriver")
 
         if not Path(driver).exists():
@@ -107,17 +106,13 @@ class Settings():
         if not isinstance(url, str):
             raise TypeError(f"url is not str it's {type(url)}")
 
-        parsed_url = urlparse(url)
-        if not all([parsed_url.scheme, parsed_url.netloc]):
-            raise ValueError(f"url is not valid")
-
         if "cses.fi" not in url:
             raise ValueError(f"url domain is not cses.fi")
 
         url = url.removesuffix("/list/")
         url = url.removesuffix("/")
 
-        return self._parser.edit("general", "cses_url")
+        return self._parser.edit("general", "cses_url", url)
 
     def set_password(self, password):
         if not isinstance(password, str):
@@ -332,32 +327,37 @@ class App:
                     except FileNotFoundError:
                         print("You need to download firefox's webdriver and it needs to in path")
                         print("It can be here https://github.com/mozilla/geckodriver/releases")
-                    except:
-                        pass
+                    except Exception as e:
+                        if os.getenv("DEVELOPMENT"):
+                            print(e)
                 case "--url":
                     try:
                         self.settings.set_cses_url(args[i+1])
                     except ValueError as e:
                         print(e.args[0])
-                    except:
-                        pass
+                    except Exception as e:
+                        if os.getenv("DEVELOPMENT"):
+                            print(e)
                 case "--dir":
                     try:
                         self.settings.set_cses_url(args[i+1])
                     except FileNotFoundError as e:
                         print(e.args[0])
-                    except:
-                        pass
+                    except Exception as e:
+                        if os.getenv("DEVELOPMENT"):
+                            print(e)
                 case "--username":
                     try:
                         self.settings.set_username(args[i+1])
-                    except:
-                        pass
+                    except Exception as e:
+                        if os.getenv("DEVELOPMENT"):
+                            print(e)
                 case "--password":
                     try:
                         self.settings.set_password(args[i+1])
-                    except:
-                        pass
+                    except Exception as e:
+                        if os.getenv("DEVELOPMENT"):
+                            print(e)
 
     def handle_download(self):
         try:
@@ -382,6 +382,9 @@ class App:
                     print("Username need to spefied by settings --username")
                 case "password is not spefied":
                     print("Password need to spefied by settings --password")
+        except Exception as e:
+            if os.getenv("DEVELOPMENT"):
+                print(e)
 
     def handle_submit(self, file: str):
         try:
@@ -410,6 +413,9 @@ class App:
                     print("Username need to spefied by settings --username")
                 case "password is not spefied":
                     print("Password need to spefied by settings --password")
+        except Exception as e:
+            if os.getenv("DEVELOPMENT"):
+                print(e)
 
 
 app = App(Path("./settings.ini"))
