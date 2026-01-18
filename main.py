@@ -8,10 +8,12 @@ from configparser import ConfigParser
 from pathlib import Path
 import argparse, os, sys
 
+
 class IniParser:
-    def __init__(self, file: str | Path) -> None:
+    def __init__(self, file: str | Path = None):
             self._parser = ConfigParser()
             self.file = file
+            self._load()
 
     @property
     def file(self):
@@ -23,32 +25,32 @@ class IniParser:
             file = Path(file)
 
         if not isinstance(file, Path):
-            raise TypeError(f"teidosto ei ole merkkijono tai polku vaan {file}")
+            raise TypeError(f"variable's file type is not Path it's {file}")
 
         if file.suffix != ".ini":
-            raise ValueError("tiedosto ei ole ini tiedosto")
-
-        if not file.is_file():
-            with open(file, "w") as f:
-                pass
+            raise ValueError("document is not ini file")
 
         self._file = file
 
     def edit(self, section: str, option: str, value: str):
         if not self._parser.has_section(section):
             self._parser.add_section(section)
-        
+
+        if not isinstance(value, str):
+            value = str(value)
+
         self._parser.set(section, option, value)
-        
+
         with open(self._file, "w", encoding="utf-8") as file:
             self._parser.write(file)
 
     def read(self, section: str, option: str):
-        self._parser.read(self._file, encoding="utf-8")
+        self._load()
         value = self._parser.get(section, option, fallback=None)
-
         return value
 
+    def _load(self):
+        self._parser.read(self._file, encoding="utf-8")
 
 class Settings():
     def __init__(self, settings_path: Path):
