@@ -36,13 +36,11 @@ class IniParser:
         self._file = file
 
     def edit(self, section: str, option: str, value: str):
-        try:
-            self._parser.set(section, option, value)
-        except NoSectionError:
-            self._parser[section] = {option: value}
-        except NoOptionError:
-            self._parser[section] = {option: value}
-
+        if not self._parser.has_section(section):
+            self._parser.add_section(section)
+        
+        self._parser.set(section, option, value)
+        
         with open(self._file, "w", encoding="utf-8") as file:
             self._parser.write(file)
 
@@ -125,7 +123,7 @@ class Settings():
         if not isinstance(password, str):
             raise TypeError(f"url is not str it's {type(password)}")
 
-        password = bytes(password)
+        password = password.encode()
         password = password.hex()
         self._parser.edit("user", "password", password)
 
@@ -414,5 +412,5 @@ class App:
                     print("Password need to spefied by settings --password")
 
 
-app = App(Path("./settings.py"))
+app = App(Path("./settings.ini"))
 app.main()
