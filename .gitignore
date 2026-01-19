@@ -197,4 +197,7 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-tehtava
+#nuitka
+*.build/
+*.dist/
+*build/

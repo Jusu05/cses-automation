@@ -6,7 +6,7 @@ from selenium.webdriver.support.ui import Select
 from bs4 import BeautifulSoup
 from configparser import ConfigParser
 from pathlib import Path
-import argparse, os, sys
+import os, sys
 
 
 class IniParser:
@@ -270,42 +270,45 @@ class CsesConnection:
 
 class App:
     def __init__(self, settings_path: Path):
-        self.parser = argparse.ArgumentParser(description="This is comand line tool for download and subting for mooc cses exesises")
         self.settings = Settings(settings_path)
 
     def main(self):
-        args = sys.argv
-        args = [arg for arg in args if not arg.endswith(".py")]
+        args = sys.argv[1:]
+
+        if len(args) == 0:
+            self.help(submit=True, download=True, settings=True)
+            return
+
         if args[0] == "--help" or  args[0] == "-h":
             self.help(submit=True, download=True, settings=True) 
             return
         
-        if args[0] == "submit":
-            if args[1] == "--help" or args[1] == "-h":
-                self.help(submit=True)
+        match args[0]:
+            case "submit":
+                if args[1] == "--help" or args[1] == "-h":
+                    self.help(submit=True)
+                    return
+                
+                self.handle_submit(args[1])
                 return
-            
-            self.handle_submit(args[1])
-            return
-        
-        if args[0] == "download":
-            if args[1] == "--help" or args[1] == "-h":
-                self.help(download=True)
+            case "download":
+                if len(args) > 2:
+                    if args[1] == "--help" or args[1] == "-h":
+                        self.help(download=True)
+                        return
+                    
+                self.handle_download()
                 return
-            
-            self.handle_download()
-            return
-
-        if args[0] == "settings":
-            if args[1] == "--help" or args[1] == "-h":
-                self.help(settings=True)
+            case "settings":
+                if args[1] == "--help" or args[1] == "-h":
+                    self.help(settings=True)
+                    return
+                
+                args = args[1:]
+                self.handle_settings(args)
                 return
-            
-            args = args[1:]
-            self.handle_settings(args)
-            return
-
-        self.help(submit=True, download=True, settings=True)
+            case _:
+                self.help(submit=True, download=True, settings=True)
 
     def help(self,*, submit=False, download=False, settings=False):
         helptext = ""
@@ -351,7 +354,7 @@ class App:
                             print(e)
                 case "--dir":
                     try:
-                        self.settings.set_cses_url(args[i+1])
+                        self.settings.set_working_dir(args[i+1])
                     except FileNotFoundError as e:
                         print(e.args[0])
                     except Exception as e:
