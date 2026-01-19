@@ -44,6 +44,8 @@ class IniParser:
         with open(self._file, "w", encoding="utf-8") as file:
             self._parser.write(file)
 
+        self._load()
+
     def read(self, section: str, option: str):
         self._load()
         value = self._parser.get(section, option, fallback=None)
@@ -284,6 +286,7 @@ class App:
                 return
             
             self.handle_submit(args[1])
+            return
         
         if args[0] == "download":
             if args[1] == "--help" or args[1] == "-h":
@@ -291,6 +294,7 @@ class App:
                 return
             
             self.handle_download()
+            return
 
         if args[0] == "settings":
             if args[1] == "--help" or args[1] == "-h":
@@ -299,7 +303,9 @@ class App:
             
             args = args[1:]
             self.handle_settings(args)
+            return
 
+        self.help(submit=True, download=True, settings=True)
 
     def help(self,*, submit=False, download=False, settings=False):
         helptext = ""
@@ -324,7 +330,7 @@ class App:
     def handle_settings(self, args: list[str]):
         for i in range(0, len(args)-1, 2):
             match args[i]:
-                case "--webriver":
+                case "--webdriver":
                     try:
                         self.settings.set_webdriver_path(args[i+1])
                     except ValueError:
@@ -363,6 +369,8 @@ class App:
                     except Exception as e:
                         if os.getenv("DEVELOPMENT"):
                             print(e)
+                case _:
+                    self.help(settings=True)
 
     def handle_download(self):
         try:

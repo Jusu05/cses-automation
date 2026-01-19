@@ -110,13 +110,13 @@ class TestSet:
         filled_temp_file = tmp_path / "test.ini"
         filled_temp_file.write_text(ini_content.strip())
         return filled_temp_file
-    
+
     def test_set_webdriver_path(self, empty_temp_file, temp_geckodriver1):
         s = Settings(empty_temp_file)
         driver = str(temp_geckodriver1)
         s.set_webdriver_path(driver)
         assert driver == s.get_webdriver_path() 
-    
+
     def test_edit_webdriver_path(self, filled_temp_file, temp_geckodriver2):
         s = Settings(filled_temp_file)
         driver = str(temp_geckodriver2)

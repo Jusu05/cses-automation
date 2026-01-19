@@ -1,6 +1,5 @@
 from main import IniParser
 from pathlib import Path
-import os
 import pytest
 
 def test_return_file_path_pased_value():
