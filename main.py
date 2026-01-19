@@ -52,6 +52,7 @@ class IniParser:
     def _load(self):
         self._parser.read(self._file, encoding="utf-8")
 
+
 class Settings():
     def __init__(self, settings_path: Path):
         self._parser = IniParser(settings_path)
@@ -75,12 +76,14 @@ class Settings():
     def get_username_and_password(self) -> tuple[str, str]:
         username = self._parser.read("user", "username")
         password = self._parser.read("user", "password")
-        password = bytes.fromhex(password)
-        password = password.decode()
+
         if not username:
             raise ValueError("username is not spefied")
         if not password:
             raise ValueError("password is not spefied")
+
+        password = bytes.fromhex(password)
+        password = password.decode()
 
         return username, password
 
@@ -96,7 +99,7 @@ class Settings():
         if not isinstance(driver, str):
             raise TypeError(f"driver is not str it's {type(driver)}")
 
-        if not driver.endswith("geckodriver"):
+        if not driver.removesuffix(".exe").endswith("geckodriver"):
             raise ValueError("webdriver is not firefoxs geckodriver")
 
         if not Path(driver).exists():
@@ -140,12 +143,12 @@ class Settings():
             try:
                 os.mkdir(dir)
             except:
-                FileNotFoundError("given path does not exist")
+                raise FileNotFoundError("given path does not exist")
 
-        if dir.is_dir():
-            FileNotFoundError("given path is not directory")
+        if not dir.is_dir():
+            raise FileNotFoundError("given path is not directory")
 
-        return self._parser.edit("system", "working_dir", str(dir))
+        self._parser.edit("system", "working_dir", str(dir))
 
 
 class CsesConnection:
