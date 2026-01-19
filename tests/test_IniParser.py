@@ -24,7 +24,7 @@ def test_value_error_raised_on_invalid_file_suffix():
     with pytest.raises(ValueError):
         i.file = "test.py"
 
-class TestIniParserReadinWriting:
+class TestReadinWriting:
     @pytest.fixture
     def temp_file(self, tmp_path):
         # Create a temporary INI file
