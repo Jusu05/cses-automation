@@ -422,6 +422,6 @@ class App:
             if os.getenv("DEVELOPMENT"):
                 print(e)
 
-
-app = App(Path("./settings.ini"))
-app.main()
+if __name__ == "__main__":
+    app = App(Path("settings.ini"))
+    app.main()
