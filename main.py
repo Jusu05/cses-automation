@@ -167,6 +167,7 @@ class CsesConnection:
         self.driver.get(f"{self.url}/list/")
 
     def login(self):
+        self.driver.get(f"{self.url}/list/")
         accaunt = self.driver.find_element(By.CSS_SELECTOR, "body > div.header > div > div > a.account")
         accaunt.click()
         
@@ -415,7 +416,9 @@ class App:
             if file not in [task[1] for task in tasks]:
                 return
 
+            self.cses_connection.login()
             self.cses_connection.submit_task(file, tasks)
+            print(self.cses_connection.task_solution_result(file, tasks))
 
         except ValueError as e:
             match e.args[0]:
