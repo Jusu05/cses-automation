@@ -6,7 +6,7 @@ from selenium.webdriver.support.ui import Select
 from bs4 import BeautifulSoup
 from configparser import ConfigParser
 from pathlib import Path
-import os, sys
+import os, sys, time
 
 
 class IniParser:
@@ -157,7 +157,9 @@ class CsesConnection:
     def __init__(self, settings: Settings):
         self._settings = settings
         options = Options()
-        options.add_argument("--headless")
+
+        if os.getenv("DEVELOPMENT"):
+            options.add_argument("--headless")
 
         driver = self._settings.get_webdriver_path()
         service = Service(driver)
@@ -242,11 +244,17 @@ class CsesConnection:
                 file.writelines(lines)
 
         self.driver.get(f"{self.url}/submit/{task[2]}")
+        time.sleep(0.5)
         upload = self.driver.find_element(By.NAME, "file")
+        time.sleep(0.5)
         upload.send_keys(str(path))
+        time.sleep(0.5)
         lanquage_selector = Select(self.driver.find_element(By.CSS_SELECTOR, "#lang"))
+        time.sleep(0.5)
         lanquage_selector.select_by_visible_text("Python3")
+        time.sleep(0.5)
         submit = self.driver.find_element(By.CSS_SELECTOR, ".content > form:nth-child(1) > p:nth-child(6) > input:nth-child(1)")
+        time.sleep(0.5)
         submit.click()
 
     def _get_task(self, task_name, tasks):
@@ -257,7 +265,7 @@ class CsesConnection:
             return
         return task[0]
 
-    def task_solution_result(self, task_name, tasks):
+    def task_solution_result(self, task_name, tasks) -> str:
         task = self._get_task(task_name, tasks)
         if not task:
             return
@@ -266,8 +274,18 @@ class CsesConnection:
         solution = self.driver.find_element(By.CSS_SELECTOR, "body > div.skeleton > div.content-wrapper > div.content > table > tbody > tr > td:nth-child(4) > a")
         solution.click()
         result = self.driver.find_element(By.CSS_SELECTOR, "body > div.skeleton > div.content-wrapper > div.content > table > tbody > tr:nth-child(6) > td:nth-child(2) > span")
-        return result.text
+        text = result.text
 
+        if text == "TEST FAILED":
+            soup = BeautifulSoup(self.driver.page_source, "html.parser")
+            content = soup.find("div", class_="content")
+            header = content.find('h3').get_text() if soup.find('h3') else ''
+            pre_texts = [pre.get_text() for pre in soup.find_all('pre')]
+            text += f"\n{header}\n"
+            text += "Test failed when given the following input: " + pre_texts[0] + "\n" if pre_texts else ""
+            text += "Error message: " + pre_texts[1] + "\n" if len(pre_texts) > 1 else ""
+
+        return text.strip()
 
 class App:
     def __init__(self, settings_path: Path):
