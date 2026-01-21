@@ -6,7 +6,7 @@ from selenium.webdriver.support.ui import Select
 from bs4 import BeautifulSoup
 from configparser import ConfigParser
 from pathlib import Path
-import os, sys, time
+import os, sys, sqlite3, time
 
 
 class IniParser:
@@ -55,7 +55,108 @@ class IniParser:
         self._parser.read(self._file, encoding="utf-8")
 
 
-class Settings():
+class SqlConnection:
+    def __init__(self, file: Path) -> None:
+        self._file = file
+
+    def write(self, command, params: tuple = None):
+        try:
+            conection = sqlite3.connect(self._file)
+            cursor = conection.cursor()
+
+            if params:
+                cursor.execute(command, params)
+            else:
+                cursor.execute(command)
+
+        except sqlite3.Error as e:
+            if os.getenv("DEVELOPMENT"):
+                print(f"virhe, {e}")
+        finally:
+            if conection:
+                conection.close()
+
+    def read(self, command, params: tuple = None):
+        try:
+            conection = sqlite3.connect(self._file)
+            cursor = conection.cursor()
+
+            if params:
+                cursor.execute(command, params)
+            else:
+                cursor.execute(command)
+
+            data = cursor.fetchall()
+            conection.commit()
+            conection.close()
+
+            return data
+
+        except sqlite3.Error as e:
+            if os.getenv("DEVELOPMENT"):
+                print(f"virhe, {e}")
+            print(f"virhe, {e}")
+        finally:
+            if conection:
+                conection.close()
+
+
+class Database:
+    def __init__(self, file: Path):
+        self.connection = SqlConnection(file)
+
+        if not file.exists():
+            self._create_database(file)
+
+    def _create_database(self, file: Path):
+        with open(file, "w") as file:
+            pass
+
+        self.connection.write(
+            """
+            CREATE TABLE "tasks" (
+                "id"        INTEGER UNIQUE,
+                "file_name" TEXT NOT NULL,
+                "task_name" INTEGER NOT NULL,
+                "passed"    INTEGER DEFAULT 0,
+                "downloaded" INTEGER DEFAULT 0,
+                PRIMARY KEY("id")
+            );
+            """.strip()
+        )
+
+    def add_task(self, task: tuple[int, str, str]):
+        self.connection.write("INSERT INTO tasks id, file_name, task_name VALUES (?,?,?)", task)
+
+
+    def get_passed_by_id(self, task_id: int):
+        self.connection.read("SELECT passed FROM tasks WHERE task_id == ?;", (task_id, ))
+
+    def get_passed_by_file_name(self, file_name: str):
+        self.connection.read("SELECT passed FROM tasks WHERE task_id == ?;", (file_name, ))
+
+    def get_id_by_file_name(self, file_name: str):
+        return self.connection.read("SELECT id FROM tasks WHERE file_name == ?;", (file_name, ))[0]
+
+    def get_task_to_download(self) -> list[int]:
+        return self.connection.read("SELECT task_name, id FROM tasks WHERE downloaded == 0;")
+
+    def set_passed_by_id(self, task_id: int, passed: int):
+        self.connection.write("UPDATE tasks set passed = ? WHERE task_id == ?;", (task_id, passed))
+
+    def set_passed_by_file_name(self, file_name: str,  passed: int):
+        self.connection.write("UPDATE tasks set passed = ? WHERE file_name == ?;", (passed, file_name))
+
+    def set_not_downloaded(self, files: list[str]):
+        files = ",".join(files)
+        self.connection.write("UPDATE task SET downloaded = CASE WHEN file_name NOT IN (?) THEN 0 ELSE downloaded END;", (files,))
+
+    def set_downloaded(self, files: list[str]):
+        files = ",".join(files)
+        self.connection.write("UPDATE task SET downloaded = CASE WHEN file_name IN (?) THEN 1 ELSE downloaded END;", (files,))
+
+
+class Settings:
     def __init__(self, settings_path: Path):
         self._parser = IniParser(settings_path)
 
