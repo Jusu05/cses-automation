@@ -158,7 +158,7 @@ class CsesConnection:
         self._settings = settings
         options = Options()
 
-        if os.getenv("DEVELOPMENT"):
+        if not os.getenv("DEVELOPMENT"):
             options.add_argument("--headless")
 
         driver = self._settings.get_webdriver_path()
