@@ -146,7 +146,7 @@ class Database:
         self.connection.write("UPDATE tasks set passed = ? WHERE id == ?;", (passed, task_id))
 
     def set_file_name_by_id(self, file_name: str, task_id: int):
-        self.connection.write("UPDATE tasks set passed = ? WHERE id == ?;", (file_name, task_id))
+        self.connection.write("UPDATE tasks set file_name = ? WHERE id == ?;", (file_name, task_id))
 
     def num_of_task(self) -> int:
         return self.connection.read("SELECT COUNT(*) FROM TASK;")[0][0]
@@ -318,13 +318,13 @@ class CsesConnection:
                 text.append(code)
 
             self._database.set_file_name_by_id(file_name[0], task[0])
-            path = Path(self._settings.get_task_dir()).joinpath(file_name[0])
+            path = Path(self._settings.get_working_dir()).joinpath(file_name[0])
             with open(path, "w", encoding="utf-8") as file:
                 file.writelines(text)
 
 
     def submit_task(self, file_name: str, task_id: int):
-        path = Path(self._settings.get_task_dir()).joinpath(file_name)
+        path = Path(self._settings.get_working_dir()).joinpath(file_name)
 
         with open(path, "r", encoding="utf-8") as file:
             lines = file.readlines()
@@ -372,18 +372,12 @@ class CsesConnection:
         return text.strip()
 
 class App:
-    def __init__(self, settings: Settings = None, database: Database = None):
-        self.settings = settings
-        self.database = database
+    def __init__(self, path: Path):
+        self.settings = Settings(path.joinpath("settings.ini"))
+        self.database = Database(path.joinpath("tasks.db"))
 
     def main(self):
-        args = sys.argv
-        if not self.settings or not self.database:
-            path = self._extrac_path(args)
-            self.settings = Settings(path.joinpath("settings.ini"))
-            self.database = Database(path.joinpath("tasks.db"))
-
-        args = args[1:]
+        args = sys.argv[1:]
 
         if len(args) == 0:
             self.help(submit=True, download=True, settings=True)
@@ -420,16 +414,6 @@ class App:
             case _:
                 self.help(submit=True, download=True, settings=True)
 
-    def _extrac_path(self, args: list[str]) -> Path:
-        path = args[0]
-        split_path = path.split("\\")
-        if len(split_path) == 1:
-            split_path = path.split("/")
-
-        if len(split_path) == 1:
-            return Path(".")
-
-        return Path("/".join(split_path[:-1]))
 
     def help(self,*, submit=False, download=False, settings=False):
         helptext = ""
@@ -503,7 +487,7 @@ class App:
 
             tasks_names = self.database.get_all_task_names()
             tasks = self.cses_connection.get_task_list(tasks_names)
-            dir = self.settings.get_task_dir()
+            dir = self.settings.get_working_dir()
             downloaded_tasks = set(os.listdir(dir))
             tasks = [task for task in tasks if task[1] not in downloaded_tasks]
             self.cses_connection.load_task(tasks)
@@ -529,7 +513,7 @@ class App:
             if not hasattr(self, "cses_connection"):
                 self.cses_connection = CsesConnection(self.settings, self.database)
 
-            dir = self.settings.get_task_dir()
+            dir = self.settings.get_working_dir()
             if len(os.listdir(dir)) == 0:
                 print("Nothing can be submitted")
                 print("Execices nedd to be downloaded")
@@ -537,13 +521,12 @@ class App:
 
             task_id = self.database.get_id_by_file_name(file)
             self.cses_connection.login()
-            self.cses_connection.submit_task()
+            self.cses_connection.submit_task(file, task_id)
             result = self.cses_connection.task_solution_result(task_id)
 
             if result == "ACCEPTED":
                 self.database.set_passed_by_id(task_id, 1)
-
-            if "TEST FAILED" in result:
+            else:
                 self.database.set_passed_by_id(task_id, 2)
 
             print(result)
@@ -565,5 +548,5 @@ class App:
                 print(e)
 
 if __name__ == "__main__":
-    app = App(Path("settings.ini"))
+    app = App(Path("."))
     app.main()
