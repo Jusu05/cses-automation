@@ -57,7 +57,7 @@ class IniParser:
 
 class SqlConnection:
     def __init__(self, file: Path) -> None:
-        self._file = file
+        self._file = str(file)
 
     def write(self, command, params: tuple = None):
         try:
@@ -68,6 +68,9 @@ class SqlConnection:
                 cursor.execute(command, params)
             else:
                 cursor.execute(command)
+
+            conection.commit()
+            conection.close()
 
         except sqlite3.Error as e:
             if os.getenv("DEVELOPMENT"):
@@ -95,7 +98,6 @@ class SqlConnection:
         except sqlite3.Error as e:
             if os.getenv("DEVELOPMENT"):
                 print(f"virhe, {e}")
-            print(f"virhe, {e}")
         finally:
             if conection:
                 conection.close()
@@ -106,54 +108,48 @@ class Database:
         self.connection = SqlConnection(file)
 
         if not file.exists():
-            self._create_database(file)
+            self._create_database()
 
-    def _create_database(self, file: Path):
-        with open(file, "w") as file:
-            pass
-
+    def _create_database(self):
         self.connection.write(
             """
             CREATE TABLE "tasks" (
                 "id"        INTEGER UNIQUE,
-                "file_name" TEXT NOT NULL,
+                "file_name" TEXT,
                 "task_name" INTEGER NOT NULL,
                 "passed"    INTEGER DEFAULT 0,
-                "downloaded" INTEGER DEFAULT 0,
                 PRIMARY KEY("id")
             );
-            """.strip()
+            """
         )
 
-    def add_task(self, task: tuple[int, str, str]):
-        self.connection.write("INSERT INTO tasks id, file_name, task_name VALUES (?,?,?)", task)
+    def add_task(self, task: tuple[str, int, str]):
+        self.connection.write("INSERT INTO tasks (id, task_name) VALUES (?,?);", task)
 
+    def add_tasks(self, tasks: list[tuple[int, str]]):
+        for task in tasks:
+            self.add_task(task)
 
     def get_passed_by_id(self, task_id: int):
-        self.connection.read("SELECT passed FROM tasks WHERE task_id == ?;", (task_id, ))
-
-    def get_passed_by_file_name(self, file_name: str):
-        self.connection.read("SELECT passed FROM tasks WHERE task_id == ?;", (file_name, ))
+        self.connection.read("SELECT passed FROM tasks WHERE id == ?;", (task_id, ))
 
     def get_id_by_file_name(self, file_name: str):
-        return self.connection.read("SELECT id FROM tasks WHERE file_name == ?;", (file_name, ))[0]
+        return self.connection.read("SELECT id FROM tasks WHERE file_name == ?;", (file_name, ))[0][0]
 
-    def get_task_to_download(self) -> list[int]:
-        return self.connection.read("SELECT task_name, id FROM tasks WHERE downloaded == 0;")
+    def get_all_task_names(self) -> set[str]:
+        tasks = self.connection.read("SELECT task_name FROM tasks;")
+        if tasks:
+            return {t[0] for t in tasks}
+        return set()
 
-    def set_passed_by_id(self, task_id: int, passed: int):
-        self.connection.write("UPDATE tasks set passed = ? WHERE task_id == ?;", (task_id, passed))
+    def set_passed_by_id(self, passed: int, task_id: int):
+        self.connection.write("UPDATE tasks set passed = ? WHERE id == ?;", (passed, task_id))
 
-    def set_passed_by_file_name(self, file_name: str,  passed: int):
-        self.connection.write("UPDATE tasks set passed = ? WHERE file_name == ?;", (passed, file_name))
+    def set_file_name_by_id(self, file_name: str, task_id: int):
+        self.connection.write("UPDATE tasks set passed = ? WHERE id == ?;", (file_name, task_id))
 
-    def set_not_downloaded(self, files: list[str]):
-        files = ",".join(files)
-        self.connection.write("UPDATE task SET downloaded = CASE WHEN file_name NOT IN (?) THEN 0 ELSE downloaded END;", (files,))
-
-    def set_downloaded(self, files: list[str]):
-        files = ",".join(files)
-        self.connection.write("UPDATE task SET downloaded = CASE WHEN file_name IN (?) THEN 1 ELSE downloaded END;", (files,))
+    def num_of_task(self) -> int:
+        return self.connection.read("SELECT COUNT(*) FROM TASK;")[0][0]
 
 
 class Settings:
@@ -255,19 +251,19 @@ class Settings:
 
 
 class CsesConnection:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, database: Database):
         self._settings = settings
+        self._database = database
+        self._init_selenium()
+        self.url = self._settings.get_cses_url()
+        self.driver.get(f"{self.url}/list/")
+
+    def _init_selenium(self):
         options = Options()
-
-        if not os.getenv("DEVELOPMENT"):
-            options.add_argument("--headless")
-
+        # options.add_argument("--headless")
         driver = self._settings.get_webdriver_path()
         service = Service(driver)
         self.driver = webdriver.Firefox(options=options, service=service)
-
-        self.url = self._settings.get_cses_url()
-        self.driver.get(f"{self.url}/list/")
 
     def login(self):
         self.driver.get(f"{self.url}/list/")
@@ -284,53 +280,51 @@ class CsesConnection:
             sigin_button = self.driver.find_element(By.CSS_SELECTOR, "#content-area > div.login-align > div > form > input.btn.btn-primary.login-form-button")
             sigin_button.click()
 
-    def get_task_list(self) -> list:
+    def get_task_list(self, tasks_name: set[str]) -> list:
         soup = BeautifulSoup(self.driver.page_source, "html.parser")
         tasks = []
         for task_list in soup.find_all("ul", class_="task-list"):
             for task in task_list.find_all("li", class_ = "task"):
                 link = task.find("a")
                 task_id = link.attrs["href"].split("/")[-1]
-                content = soup.find("div", class_="md")
 
-                self.driver.get(f"{self.url}/task/{task_id}")
-                soup2 = BeautifulSoup(self.driver.page_source, "html.parser")
-                content = soup2.find("div", class_="md")
-                file_name = [file.text for file in content.find_all("code") if file.text.endswith(".py")]
-                if len(file_name) == 0:
+                if link.text in tasks_name:
                     continue
 
-                tasks.append((link.text, file_name[0], task_id))
+                self._database.add_task((int(task_id), link.text))
+                tasks.append((int(task_id), link.text))
 
         return tasks
     
-    def load_task(self, tasks: list):
+    def load_task(self, tasks: list[int, str]) -> list:
         for task in tasks:
-            self.driver.get(f"{self.url}/task/{task[2]}")
+            self.driver.get(f"{self.url}/task/{task[0]}")
             soup = BeautifulSoup(self.driver.page_source, "html.parser")
             content = soup.find("div", class_="md")
+            file_name = [file.text for file in content.find_all("code") if file.text.endswith(".py")]
+            if len(file_name) == 0:
+                continue
+
             code = content.find("pre", class_="resize-horizontal prettyprint lang-python prettyprinted")
-            
-            if code:    
+
+            if code:
                 code.extract()
                 code = code.get_text()
-            
+
             text = ["#"+child.text for child in content.children]
             text.append("\n")
 
             if code:
                 text.append(code)
 
-            path = Path(self._settings.get_working_dir()).joinpath(task[1])
+            self._database.set_file_name_by_id(file_name[0], task[0])
+            path = Path(self._settings.get_task_dir()).joinpath(file_name[0])
             with open(path, "w", encoding="utf-8") as file:
                 file.writelines(text)
 
-    def submit_task(self, task_name, tasks):
-        task = self._get_task(task_name, tasks)
-        if not task:
-            return
 
-        path = Path(self._settings.get_working_dir()).joinpath(f"{task[1]}")
+    def submit_task(self, file_name: str, task_id: int):
+        path = Path(self._settings.get_task_dir()).joinpath(file_name)
 
         with open(path, "r", encoding="utf-8") as file:
             lines = file.readlines()
@@ -344,7 +338,7 @@ class CsesConnection:
             with open(path, "w", encoding="utf-8") as file:
                 file.writelines(lines)
 
-        self.driver.get(f"{self.url}/submit/{task[2]}")
+        self.driver.get(f"{self.url}/submit/{task_id}")
         time.sleep(0.5)
         upload = self.driver.find_element(By.NAME, "file")
         time.sleep(0.5)
@@ -358,20 +352,9 @@ class CsesConnection:
         time.sleep(0.5)
         submit.click()
 
-    def _get_task(self, task_name, tasks):
-        task = list(filter(lambda task: task[0]==task_name, tasks))
-        if len(task) == 0:
-            task = list(filter(lambda task: task[1]==task_name, tasks))
-        if len(task) == 0:
-            return
-        return task[0]
 
-    def task_solution_result(self, task_name, tasks) -> str:
-        task = self._get_task(task_name, tasks)
-        if not task:
-            return
-
-        self.driver.get(f"{self.url}/view/{task[2]}/")
+    def task_solution_result(self, task_id: int) -> str:
+        self.driver.get(f"{self.url}/view/{task_id}/")
         solution = self.driver.find_element(By.CSS_SELECTOR, "body > div.skeleton > div.content-wrapper > div.content > table > tbody > tr > td:nth-child(4) > a")
         solution.click()
         result = self.driver.find_element(By.CSS_SELECTOR, "body > div.skeleton > div.content-wrapper > div.content > table > tbody > tr:nth-child(6) > td:nth-child(2) > span")
@@ -389,11 +372,18 @@ class CsesConnection:
         return text.strip()
 
 class App:
-    def __init__(self, settings_path: Path):
-        self.settings = Settings(settings_path)
+    def __init__(self, settings: Settings = None, database: Database = None):
+        self.settings = settings
+        self.database = database
 
     def main(self):
-        args = sys.argv[1:]
+        args = sys.argv
+        if not self.settings or not self.database:
+            path = self._extrac_path(args)
+            self.settings = Settings(path.joinpath("settings.ini"))
+            self.database = Database(path.joinpath("tasks.db"))
+
+        args = args[1:]
 
         if len(args) == 0:
             self.help(submit=True, download=True, settings=True)
@@ -430,10 +420,21 @@ class App:
             case _:
                 self.help(submit=True, download=True, settings=True)
 
+    def _extrac_path(self, args: list[str]) -> Path:
+        path = args[0]
+        split_path = path.split("\\")
+        if len(split_path) == 1:
+            split_path = path.split("/")
+
+        if len(split_path) == 1:
+            return Path(".")
+
+        return Path("/".join(split_path[:-1]))
+
     def help(self,*, submit=False, download=False, settings=False):
         helptext = ""
         if submit and download and settings:
-            helptext += "Usage: progam <command>\n\n"
+            helptext += "Usage: program <command>\n\n"
             helptext += "list of commands:\n"
         if submit:
             helptext += "submit <file> - file name that will be submited\n"
@@ -474,7 +475,7 @@ class App:
                             print(e)
                 case "--dir":
                     try:
-                        self.settings.set_working_dir(args[i+1])
+                        self.settings.set_task_dir(args[i+1])
                     except FileNotFoundError as e:
                         print(e.args[0])
                     except Exception as e:
@@ -498,10 +499,11 @@ class App:
     def handle_download(self):
         try:
             if not hasattr(self, "cses_connection"):
-                self.cses_connection = CsesConnection(self.settings)
+                self.cses_connection = CsesConnection(self.settings, self.database)
 
-            tasks = self.cses_connection.get_task_list()
-            dir = self.settings.get_working_dir()
+            tasks_names = self.database.get_all_task_names()
+            tasks = self.cses_connection.get_task_list(tasks_names)
+            dir = self.settings.get_task_dir()
             downloaded_tasks = set(os.listdir(dir))
             tasks = [task for task in tasks if task[1] not in downloaded_tasks]
             self.cses_connection.load_task(tasks)
@@ -525,19 +527,26 @@ class App:
     def handle_submit(self, file: str):
         try:
             if not hasattr(self, "cses_connection"):
-                self.cses_connection = CsesConnection(self.settings)
+                self.cses_connection = CsesConnection(self.settings, self.database)
 
-            tasks = self.cses_connection.get_task_list()
-
-            if len(tasks) == 0:
+            dir = self.settings.get_task_dir()
+            if len(os.listdir(dir)) == 0:
+                print("Nothing can be submitted")
+                print("Execices nedd to be downloaded")
                 return
 
-            if file not in [task[1] for task in tasks]:
-                return
-
+            task_id = self.database.get_id_by_file_name(file)
             self.cses_connection.login()
-            self.cses_connection.submit_task(file, tasks)
-            print(self.cses_connection.task_solution_result(file, tasks))
+            self.cses_connection.submit_task()
+            result = self.cses_connection.task_solution_result(task_id)
+
+            if result == "ACCEPTED":
+                self.database.set_passed_by_id(task_id, 1)
+
+            if "TEST FAILED" in result:
+                self.database.set_passed_by_id(task_id, 2)
+
+            print(result)
 
         except ValueError as e:
             match e.args[0]:
