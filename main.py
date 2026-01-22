@@ -122,22 +122,35 @@ class Database:
             );
             """
         )
+        self.connection.write(
+            """
+            CREATE TABLE weeks (
+                id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                week TEXT NOT NULL,
+                task_id INTEGER,
+                FOREIGN KEY (task_id) REFERENCES tasks(id)
+            );
+            """
+        )
 
-    def add_task(self, task: tuple[str, int, str]):
-        self.connection.write("INSERT INTO tasks (id, task_name) VALUES (?,?);", task)
-
-    def add_tasks(self, tasks: list[tuple[int, str]]):
-        for task in tasks:
-            self.add_task(task)
+    def add_task(self, task: tuple[int, str, str]):
+        self.connection.write("INSERT INTO tasks (id, task_name) VALUES (?,?);", (task[0],task[1]))
+        self.connection.write("INSERT INTO weeks (week, task_id) VALUES (?,?);", (task[0],task[2]))
 
     def get_passed_by_id(self, task_id: int):
         self.connection.read("SELECT passed FROM tasks WHERE id == ?;", (task_id, ))
 
-    def get_id_by_file_name(self, file_name: str):
-        return self.connection.read("SELECT id FROM tasks WHERE file_name == ?;", (file_name, ))[0][0]
+    def get_id_week_by_file_name(self, file_name: str):
+        return self.connection.read("SELECT t.id, w.week FROM tasks AS t JOIN weeks AS w ON t.id == w.task_id WHERE t.file_name == ?;", (file_name, ))[0]
 
     def get_all_task_names(self) -> set[str]:
         tasks = self.connection.read("SELECT task_name FROM tasks;")
+        if tasks:
+            return {t[0] for t in tasks}
+        return set()
+
+    def get_all_weeks(self) -> set[str]:
+        tasks = self.connection.read("SELECT DISTINCT week FROM weeks;")
         if tasks:
             return {t[0] for t in tasks}
         return set()
@@ -260,7 +273,7 @@ class CsesConnection:
 
     def _init_selenium(self):
         options = Options()
-        # options.add_argument("--headless")
+        options.add_argument("--headless")
         driver = self._settings.get_webdriver_path()
         service = Service(driver)
         self.driver = webdriver.Firefox(options=options, service=service)
@@ -284,6 +297,7 @@ class CsesConnection:
         soup = BeautifulSoup(self.driver.page_source, "html.parser")
         tasks = []
         for task_list in soup.find_all("ul", class_="task-list"):
+            week = task_list.previous_sibling.previous_sibling.text
             for task in task_list.find_all("li", class_ = "task"):
                 link = task.find("a")
                 task_id = link.attrs["href"].split("/")[-1]
@@ -291,8 +305,8 @@ class CsesConnection:
                 if link.text in tasks_name:
                     continue
 
-                self._database.add_task((int(task_id), link.text))
-                tasks.append((int(task_id), link.text))
+                self._database.add_task((int(task_id), link.text, week))
+                tasks.append((int(task_id), link.text, week))
 
         return tasks
     
@@ -318,13 +332,18 @@ class CsesConnection:
                 text.append(code)
 
             self._database.set_file_name_by_id(file_name[0], task[0])
-            path = Path(self._settings.get_working_dir()).joinpath(file_name[0])
+
+            path = Path(self._settings.get_working_dir()).joinpath(tasks[2])
+            if not path.exists():
+                os.mkdir(path)
+            path.joinpath(file_name[0])
+
             with open(path, "w", encoding="utf-8") as file:
                 file.writelines(text)
 
 
-    def submit_task(self, file_name: str, task_id: int):
-        path = Path(self._settings.get_working_dir()).joinpath(file_name)
+    def submit_task(self, file_name: str, week: str, task_id: int):
+        path = Path(self._settings.get_working_dir()).joinpath(week).joinpath(file_name)
 
         with open(path, "r", encoding="utf-8") as file:
             lines = file.readlines()
@@ -414,7 +433,6 @@ class App:
             case _:
                 self.help(submit=True, download=True, settings=True)
 
-
     def help(self,*, submit=False, download=False, settings=False):
         helptext = ""
         if submit and download and settings:
@@ -487,8 +505,7 @@ class App:
 
             tasks_names = self.database.get_all_task_names()
             tasks = self.cses_connection.get_task_list(tasks_names)
-            dir = self.settings.get_working_dir()
-            downloaded_tasks = set(os.listdir(dir))
+            downloaded_tasks = set(self._list_tasks_dir())
             tasks = [task for task in tasks if task[1] not in downloaded_tasks]
             self.cses_connection.load_task(tasks)
 
@@ -513,15 +530,19 @@ class App:
             if not hasattr(self, "cses_connection"):
                 self.cses_connection = CsesConnection(self.settings, self.database)
 
-            dir = self.settings.get_working_dir()
-            if len(os.listdir(dir)) == 0:
+            if len(self._list_tasks_dir()) == 0:
                 print("Nothing can be submitted")
                 print("Execices nedd to be downloaded")
                 return
 
-            task_id = self.database.get_id_by_file_name(file)
+            files = file.split("\\")
+            if len(files) == 1:
+                files = file.split("/")
+            file = files[0]
+
+            task_id, week = self.database.get_id_week_by_file_name(file)
             self.cses_connection.login()
-            self.cses_connection.submit_task(file, task_id)
+            self.cses_connection.submit_task(file, week, task_id)
             result = self.cses_connection.task_solution_result(task_id)
 
             if result == "ACCEPTED":
@@ -546,6 +567,20 @@ class App:
         except Exception as e:
             if os.getenv("DEVELOPMENT"):
                 print(e)
+
+    def _list_tasks_dir(self) -> list[str]:
+        path = Path(self.settings.get_working_dir())
+        weeks = self.database.get_all_weeks()
+
+        if len(weeks) == 0:
+            return []
+
+        tasks = []
+        for week in weeks:
+            tasks.extend(os.listdir(path.joinpath(week)))
+
+        return tasks
+
 
 if __name__ == "__main__":
     app = App(Path("."))
