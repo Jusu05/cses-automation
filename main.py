@@ -527,20 +527,26 @@ class App:
 
     def handle_submit(self, file: str):
         try:
-            if not hasattr(self, "cses_connection"):
-                self.cses_connection = CsesConnection(self.settings, self.database)
-
             if len(self._list_tasks_dir()) == 0:
                 print("Nothing can be submitted")
                 print("Execices nedd to be downloaded")
                 return
 
-            files = file.split("\\")
-            if len(files) == 1:
-                files = file.split("/")
-            file = files[0]
+            if "\\" in file:
+                file = file.split("\\")[0]
+            if "/" in file:
+                file = file.split("/")[0]
 
             task_id, week = self.database.get_id_week_by_file_name(file)
+            path = Path(self.settings.get_working_dir()).joinpath(week).joinpath(file)
+
+            if not path.exists():
+                print(f"your file provited does not exists")
+                return
+
+            if not hasattr(self, "cses_connection"):
+                self.cses_connection = CsesConnection(self.settings, self.database)
+
             self.cses_connection.login()
             self.cses_connection.submit_task(file, week, task_id)
             result = self.cses_connection.task_solution_result(task_id)
