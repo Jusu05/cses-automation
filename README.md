@@ -21,10 +21,10 @@ source .venv/bin/activate  # On Windows use `.venv\Scripts\activate`
 pip install -r requirements.txt
 
 ```
-To run progrma also Firfox and it's webdriver Geckodriver need to be installed.
+To run program also Firfox and it's webdriver Geckodriver need to be installed.
 
 ## Running
-Before usingn commands 'submit' or 'download' all settings need to be set
+Before usign commands 'submit' or 'download' all settings need to be set
 ```bash
 python main.py <command>
 
