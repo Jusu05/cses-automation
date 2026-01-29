@@ -11,9 +11,9 @@ import os, sys, sqlite3, time
 
 class IniParser:
     def __init__(self, file: str | Path = None):
-            self._parser = ConfigParser()
-            self.file = file
-            self._load()
+        self._parser = ConfigParser()
+        self.file = file
+        self._load()
 
     @property
     def file(self):
@@ -380,15 +380,9 @@ class CsesConnection:
         text = result.text
 
         if text == "TEST FAILED":
-            soup = BeautifulSoup(self.driver.page_source, "html.parser")
-            content = soup.find("div", class_="content")
-            header = content.find('h3').get_text() if soup.find('h3') else ''
-            pre_texts = [pre.get_text() for pre in soup.find_all('pre')]
-            text += f"\n{header}\n"
-            text += "Test failed when given the following input: " + pre_texts[0] + "\n" if pre_texts else ""
-            text += "Error message: " + pre_texts[1] + "\n" if len(pre_texts) > 1 else ""
+            text += f"\n find reason from: {self.driver.current_url}"
 
-        return text.strip()
+        return text
 
 class App:
     def __init__(self, path: Path):
