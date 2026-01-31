@@ -393,11 +393,11 @@ class App:
         args = sys.argv[1:]
 
         if len(args) == 0:
-            self.help(submit=True, download=True, settings=True)
+            self.help(submit=True, download=True, settings=True, url=True)
             return
 
         if args[0] == "--help" or  args[0] == "-h":
-            self.help(submit=True, download=True, settings=True) 
+            self.help(submit=True, download=True, settings=True, url=True)
             return
         
         match args[0]:
@@ -416,6 +416,14 @@ class App:
                     
                 self.handle_download()
                 return
+            case "url":
+                if args[1] == "--help" or args[1] == "-h":
+                    self.help(url=True)
+                    return
+
+                args = args[1:]
+                self.handle_url(args)
+                return
             case "settings":
                 if args[1] == "--help" or args[1] == "-h":
                     self.help(settings=True)
@@ -425,9 +433,9 @@ class App:
                 self.handle_settings(args)
                 return
             case _:
-                self.help(submit=True, download=True, settings=True)
+                self.help(submit=True, download=True, settings=True, url=True)
 
-    def help(self,*, submit=False, download=False, settings=False):
+    def help(self,*, submit=False, download=False, settings=False, url=False):
         helptext = ""
         if submit and download and settings:
             helptext += "Usage: program <command>\n\n"
@@ -436,6 +444,8 @@ class App:
             helptext += "submit <file> - file name that will be submited\n"
         if download:
             helptext += "download - downloads all not yet downloaded excises\n"
+        if url:
+            helptext += "url <file> - file name that shows execise page\n"
         if settings:
             helptext += "settings <argumets...> - settings for program\n\n"
             helptext += "    list of argumets\n"
@@ -568,18 +578,34 @@ class App:
             if os.getenv("DEVELOPMENT"):
                 print(e)
 
-    def _list_tasks_dir(self) -> list[str]:
+    def _list_tasks_dir(self) -> set[str]:
         path = Path(self.settings.get_working_dir())
         weeks = self.database.get_all_weeks()
 
         if len(weeks) == 0:
-            return []
+            return {}
 
         tasks = []
         for week in weeks:
             tasks.extend(os.listdir(path.joinpath(week)))
+        for m in tasks:
+            assert not isinstance(m,list)
+        return set(tasks)
 
-        return tasks
+    def handle_url(self, file):
+        try:
+            url = self.settings.get_cses_url()
+            tasks = self._list_tasks_dir()
+            if file not in tasks:
+                print("exesize not loaded")
+                return
+            id, _ = self.database.get_id_week_by_file_name(file)
+            print(url+"/task/"+str(id))
+        except ValueError as e:
+            print(e)
+        except Exception as e:
+            if os.getenv("DEVELOPMENT"):
+                print(e)
 
 
 if __name__ == "__main__":
