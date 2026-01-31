@@ -31,6 +31,7 @@ python main.py <command>
 # list of commands:
 # submit <file> - file name that will be submited
 # download - downloads all not yet downloaded excises
+# url <file> - file name that shows execise page
 # settings <argumets...> - settings for program
 # 
 #     list of argumets
