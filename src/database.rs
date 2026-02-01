@@ -1,3 +1,6 @@
+use std::collections::HashSet;
+
+#[derive(Copy, Clone)]
 pub struct Database;
 
 impl Database {

@@ -1,3 +1,4 @@
+#[derive(Copy, Clone)]
 pub struct Settings;
 
 impl Settings {

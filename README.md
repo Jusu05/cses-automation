@@ -1,7 +1,7 @@
 
 # CSES Automation
 
-This project is comand linetool for submissions and problem fetching Helsinki University cses courses. It uses python 3.10+, selenium and beutifullsuop4 for interacting with cses website and curently supports only firefox and geckoriver.
+This project is comandlinetool for submissions and problem fetching Helsinki University cses courses. Its writen in rust and uses browser automation to interact with cses website and curently supports only firefox and geckoriver.
 
 
 ## Installation
