@@ -1,5 +1,5 @@
 use crate::database::Database;
-use crate::settings::Settings;
+use crate::settings::{Settings, SettingsError};
 use scraper::{Html, Selector, element_ref::ElementRef};
 use std::collections::HashSet;
 use std::fs::{self, File, OpenOptions};
@@ -13,6 +13,7 @@ pub enum CsesConnectionError {
     WebDriver(thirtyfour::error::WebDriverError),
     Sql(rusqlite::Error),
     Io(std::io::Error),
+    Setting(SettingsError),
 }
 
 impl From<thirtyfour::error::WebDriverError> for CsesConnectionError {
@@ -33,6 +34,12 @@ impl From<std::io::Error> for CsesConnectionError {
     }
 }
 
+impl From<SettingsError> for CsesConnectionError {
+    fn from(err: SettingsError) -> Self {
+        CsesConnectionError::Setting(err)
+    }
+}
+
 pub struct CsesConnection {
     settings: Settings,
     database: Database,
@@ -49,7 +56,7 @@ impl Drop for CsesConnection {
 
 impl CsesConnection {
     pub async fn new(settings: Settings, database: Database) -> Result<Self, CsesConnectionError> {
-        let webrdriver = settings.get_webdriver_path();
+        let webrdriver = settings.get_webdriver_path()?;
         let child = Command::new(webrdriver)
             .arg("--port")
             .arg("4444")
@@ -60,7 +67,7 @@ impl CsesConnection {
 
         let caps = DesiredCapabilities::firefox();
         let driver = WebDriver::new("http://localhost:4444", caps).await?;
-        let url = settings.get_cses_url();
+        let url = settings.get_cses_url()?;
         driver.goto(format!("{}/list/", url)).await?;
 
         Ok(Self {
@@ -71,8 +78,8 @@ impl CsesConnection {
         })
     }
 
-    async fn login(&self) -> Result<(), CsesConnectionError>{
-        let url = self.settings.get_cses_url();
+    async fn login(&self) -> Result<(), CsesConnectionError> {
+        let url = self.settings.get_cses_url()?;
         self.driver.goto(format!("{}/list/", url)).await?;
 
         let accaunt = self
@@ -85,7 +92,7 @@ impl CsesConnection {
         let password_field = self.driver.find(By::Id("password")).await.ok();
 
         if let (Some(username_field), Some(password_field)) = (username_field, password_field) {
-            let (username, password) = self.settings.get_username_and_password();
+            let (username, password) = self.settings.get_username_and_password()?;
             username_field.send_keys(username).await?;
             password_field.send_keys(password).await?;
             let sigin_button = self.driver.find(By::Css("#content-area > div.login-align > div > form > input.btn.btn-primary.login-form-button")).await?;
@@ -94,11 +101,11 @@ impl CsesConnection {
         Ok(())
     }
 
-    pub async fn load_task(&self) -> Result<(), CsesConnectionError>{
+    pub async fn load_task(&self) -> Result<(), CsesConnectionError> {
         let tasks = self.get_tasks().await?;
 
         for task in tasks {
-            let url = self.settings.get_cses_url();
+            let url = self.settings.get_cses_url()?;
             self.driver.goto(format!("{}/task/{}", url, task.0)).await?;
             let page_source = self.driver.source().await.unwrap();
             let html = Html::parse_document(&page_source);
@@ -120,7 +127,7 @@ impl CsesConnection {
                 None
             };
 
-            let dir = self.settings.get_working_dir();
+            let dir = self.settings.get_working_dir()?;
             let path = PathBuf::from(dir).join(task.2).join(task.1);
             let mut file = File::create(path)?;
             for child in content.child_elements() {
@@ -143,7 +150,7 @@ impl CsesConnection {
 
     async fn get_tasks(&self) -> Result<Vec<(String, String, String)>, CsesConnectionError> {
         let loaded_tasks = self.list_task_dir()?;
-        let url = self.settings.get_cses_url();
+        let url = self.settings.get_cses_url()?;
         self.driver.goto(format!("{}/list/", url)).await?;
 
         let html = Html::parse_document(&self.driver.source().await.unwrap());
@@ -176,7 +183,7 @@ impl CsesConnection {
     }
 
     fn list_task_dir(&self) -> Result<HashSet<String>, CsesConnectionError> {
-        let path = PathBuf::from(self.settings.get_working_dir());
+        let path = PathBuf::from(self.settings.get_working_dir()?);
         let weeks = self.database.get_all_weeks()?;
 
         if weeks.is_empty() {
@@ -212,10 +219,10 @@ impl CsesConnection {
         false
     }
 
-    pub async fn submit_task(&self, file: String) -> Result<(), CsesConnectionError>{
+    pub async fn submit_task(&self, file: String) -> Result<(), CsesConnectionError> {
         let id = self.database.get_id_by_file_name(&file)?;
         let week = self.database.get_week_by_file_name(&file)?;
-        let dir = self.settings.get_working_dir();
+        let dir = self.settings.get_working_dir()?;
         let path = PathBuf::from(dir).join(week).join(&file);
 
         let file = File::open(&path)?;
@@ -242,7 +249,7 @@ impl CsesConnection {
 
         self.login().await?;
 
-        let url = self.settings.get_cses_url();
+        let url = self.settings.get_cses_url()?;
 
         self.driver.goto(format!("{}/submit/{}", url, id)).await?;
         thread::sleep(Duration::from_millis(500));
