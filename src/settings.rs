@@ -1,6 +1,7 @@
 use configparser::ini::Ini;
 use std::path::PathBuf;
 
+#[derive(Debug)]
 pub enum SettingsError {
     SettingNotFuond(String),
     ValueError(String),

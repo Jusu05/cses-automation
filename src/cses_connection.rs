@@ -9,6 +9,7 @@ use std::process::{Command, Stdio};
 use std::{thread, time::Duration};
 use thirtyfour::prelude::*;
 
+#[derive(Debug)]
 pub enum CsesConnectionError {
     WebDriver(thirtyfour::error::WebDriverError),
     Sql(rusqlite::Error),

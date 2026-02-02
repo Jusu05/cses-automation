@@ -1,7 +1,6 @@
+pub mod cses_connection;
 pub mod database;
 pub mod settings;
-pub mod cses_connection;
 
-pub fn main_loop() {
-
-}
+#[tokio::main]
+pub async fn main_loop() {}

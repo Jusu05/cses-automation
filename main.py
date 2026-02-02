@@ -229,7 +229,7 @@ class Settings:
         url = url.removesuffix("/list/")
         url = url.removesuffix("/")
 
-        return self._parser.edit("general", "cses_url", url)
+        self._parser.edit("general", "cses_url", url)
 
     def set_password(self, password):
         if not isinstance(password, str):
