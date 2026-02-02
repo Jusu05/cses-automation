@@ -3,28 +3,60 @@ use crate::settings::Settings;
 use scraper::{Html, Selector, element_ref::ElementRef};
 use std::collections::HashSet;
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::{thread, time::Duration};
 use thirtyfour::prelude::*;
-struct CsesConnection {
+
+pub enum CsesConnectionError {
+    WebDriver(thirtyfour::error::WebDriverError),
+    Sql(rusqlite::Error),
+    Io(std::io::Error),
+}
+
+impl From<thirtyfour::error::WebDriverError> for CsesConnectionError {
+    fn from(err: thirtyfour::error::WebDriverError) -> Self {
+        CsesConnectionError::WebDriver(err)
+    }
+}
+
+impl From<rusqlite::Error> for CsesConnectionError {
+    fn from(err: rusqlite::Error) -> Self {
+        CsesConnectionError::Sql(err)
+    }
+}
+
+impl From<std::io::Error> for CsesConnectionError {
+    fn from(err: std::io::Error) -> Self {
+        CsesConnectionError::Io(err)
+    }
+}
+
+pub struct CsesConnection {
     settings: Settings,
     database: Database,
     driver: WebDriver,
+    child: std::process::Child,
+}
+
+impl Drop for CsesConnection {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
 }
 
 impl CsesConnection {
-    pub async fn new(settings: Settings, database: Database) -> WebDriverResult<Self> {
+    pub async fn new(settings: Settings, database: Database) -> Result<Self, CsesConnectionError> {
         let webrdriver = settings.get_webdriver_path();
-        Command::new(webrdriver)
+        let child = Command::new(webrdriver)
             .arg("--port")
             .arg("4444")
             .arg("--headless")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
-            .spawn()
-            .expect("Failed to start GeckoDriver");
+            .spawn()?;
 
         let caps = DesiredCapabilities::firefox();
         let driver = WebDriver::new("http://localhost:4444", caps).await?;
@@ -35,10 +67,11 @@ impl CsesConnection {
             driver,
             settings,
             database,
+            child,
         })
     }
 
-    async fn login(&self) -> WebDriverResult<()> {
+    async fn login(&self) -> Result<(), CsesConnectionError>{
         let url = self.settings.get_cses_url();
         self.driver.goto(format!("{}/list/", url)).await?;
 
@@ -46,22 +79,22 @@ impl CsesConnection {
             .driver
             .find(By::Css("body > div.header > div > div > a.account"))
             .await?;
-        accaunt.click();
+        accaunt.click().await?;
 
         let username_field = self.driver.find(By::Id("username")).await.ok();
         let password_field = self.driver.find(By::Id("password")).await.ok();
 
         if let (Some(username_field), Some(password_field)) = (username_field, password_field) {
             let (username, password) = self.settings.get_username_and_password();
-            username_field.send_keys(username);
-            password_field.send_keys(password);
+            username_field.send_keys(username).await?;
+            password_field.send_keys(password).await?;
             let sigin_button = self.driver.find(By::Css("#content-area > div.login-align > div > form > input.btn.btn-primary.login-form-button")).await?;
-            sigin_button.click();
+            sigin_button.click().await?;
         }
         Ok(())
     }
 
-    pub async fn load_task(&self) -> WebDriverResult<()> {
+    pub async fn load_task(&self) -> Result<(), CsesConnectionError>{
         let tasks = self.get_tasks().await?;
 
         for task in tasks {
@@ -101,14 +134,14 @@ impl CsesConnection {
             }
 
             if let Some(code) = code {
-                writeln!(file, "{}", code);
+                writeln!(file, "{}", code)?;
             }
         }
 
         Ok(())
     }
 
-    async fn get_tasks(&self) -> WebDriverResult<Vec<(String, String, String)>> {
+    async fn get_tasks(&self) -> Result<Vec<(String, String, String)>, CsesConnectionError> {
         let loaded_tasks = self.list_task_dir()?;
         let url = self.settings.get_cses_url();
         self.driver.goto(format!("{}/list/", url)).await?;
@@ -133,6 +166,7 @@ impl CsesConnection {
                     let parts: Vec<&str> = link.split("/").collect();
                     let id = parts.last().unwrap();
                     let week = heading.text().next().unwrap().to_owned();
+                    self.database.add_task(id, &task_name, &week)?;
                     tasks_ids.push((id.to_string(), task_name, week));
                 }
             }
@@ -141,9 +175,9 @@ impl CsesConnection {
         Ok(tasks_ids)
     }
 
-    fn list_task_dir(&self) -> Result<HashSet<String>, io::Error> {
+    fn list_task_dir(&self) -> Result<HashSet<String>, CsesConnectionError> {
         let path = PathBuf::from(self.settings.get_working_dir());
-        let weeks = self.database.get_all_weeks();
+        let weeks = self.database.get_all_weeks()?;
 
         if weeks.is_empty() {
             return Ok(HashSet::new());
@@ -178,9 +212,9 @@ impl CsesConnection {
         false
     }
 
-    pub async fn submit_task(&self, file: String) -> WebDriverResult<()> {
-        let id = self.database.get_id_by_file_name(&file);
-        let week = self.database.get_week_by_file_name(&file);
+    pub async fn submit_task(&self, file: String) -> Result<(), CsesConnectionError>{
+        let id = self.database.get_id_by_file_name(&file)?;
+        let week = self.database.get_week_by_file_name(&file)?;
         let dir = self.settings.get_working_dir();
         let path = PathBuf::from(dir).join(week).join(&file);
 
@@ -206,16 +240,16 @@ impl CsesConnection {
             }
         }
 
-        self.login().await;
+        self.login().await?;
 
         let url = self.settings.get_cses_url();
 
-        self.driver.goto(format!("{}/submit/{}", url, id));
+        self.driver.goto(format!("{}/submit/{}", url, id)).await?;
         thread::sleep(Duration::from_millis(500));
         let upload = self.driver.find(By::Name("file")).await?;
         thread::sleep(Duration::from_millis(500));
         let s = path.to_str().unwrap();
-        upload.send_keys(s);
+        upload.send_keys(s).await?;
         thread::sleep(Duration::from_millis(500));
         let submit = self
             .driver
