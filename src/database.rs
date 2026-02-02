@@ -90,7 +90,7 @@ impl Database {
         let conn = Connection::open(&self.file)?;
         let week: String = conn.query_row(
             "SELECT w.week FROM tasks AS t JOIN weeks AS w ON t.id = w.task_id WHERE t.file_name = ?1;",
-            (file_name,), 
+            (file_name,),
             |row| row.get(0)
         )?;
         Ok(week)

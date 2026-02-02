@@ -56,7 +56,7 @@ fn test_set_webdriver_path() {
     let driver = temp_geckodriver_exe(ini.parent().unwrap());
 
     let s = Settings::new(ini);
-    s.set_webdriver_path(&driver);
+    s.set_webdriver_path(&driver).unwrap();
 
     let result = s.get_webdriver_path().unwrap();
     assert_eq!(driver.to_str().unwrap(), result);
@@ -68,7 +68,7 @@ fn test_edit_webdriver_path() {
     let driver = temp_geckodriver(ini.parent().unwrap());
 
     let s = Settings::new(ini);
-    s.set_webdriver_path(&driver);
+    s.set_webdriver_path(&driver).unwrap();
 
     let result = s.get_webdriver_path().unwrap();
     assert_eq!(driver.to_str().unwrap(), result);
@@ -83,7 +83,7 @@ fn test_set_webdriver_path_error_if_not_geckodriver() {
 }
 
 #[test]
-fn test_set_webdriver_path_file_not_found() {
+fn test_set_webdriver_path_error_if_file_not_found() {
     let (_dir, ini, _) = filled_temp_file();
     let s = Settings::new(ini);
 
@@ -160,7 +160,8 @@ fn test_set_workdir_str() {
     let temp = TempDir::new().unwrap();
 
     let s = Settings::new(ini);
-    s.set_working_dir(temp.path().to_str().unwrap().into()).unwrap();
+    s.set_working_dir(temp.path().to_str().unwrap().into())
+        .unwrap();
 
     assert_eq!(temp.path().to_str().unwrap(), s.get_working_dir().unwrap());
 }

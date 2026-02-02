@@ -156,15 +156,22 @@ impl Settings {
             return Err(SettingsError::ReadWriteError);
         }
 
-        if !driver.ends_with("geckodriver.exe") || !driver.ends_with("geckodriver") {
+        if !driver.exists() {
             return Err(SettingsError::ValueError(
-                "webdriver is not firefoxs geckodriver".to_owned(),
+                "driver does not exists".to_owned(),
             ));
         }
-        let s = driver.to_str().unwrap().to_owned();
-        config.set("general", "webdriver", Some(s));
-        config.write(&self.file)?;
-        Ok(())
+
+        if driver.ends_with("geckodriver.exe") || driver.ends_with("geckodriver") {
+            let s = driver.to_str().unwrap().to_owned();
+            config.set("general", "webdriver", Some(s));
+            config.write(&self.file)?;
+            return Ok(());
+        } else {
+            return Err(SettingsError::ValueError(
+                "webdriver is not firefox's geckodriver".to_owned(),
+            ));
+        }
     }
 
     pub fn set_cses_url(&self, url: &str) -> Result<(), SettingsError> {
@@ -181,8 +188,16 @@ impl Settings {
         }
 
         let url = url.trim();
-        let url = url.strip_suffix("/list/").unwrap();
-        let url = url.strip_suffix("/").unwrap();
+        let url = if let Some(striped) = url.strip_suffix("/list/") {
+            striped
+        } else {
+            url
+        };
+        let url = if let Some(striped) = url.strip_suffix("/") {
+            striped
+        } else {
+            url
+        };
         config.set("general", "cses_url", Some(url.to_owned()));
         config.write(&self.file)?;
         Ok(())
