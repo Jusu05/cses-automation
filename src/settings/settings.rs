@@ -6,6 +6,7 @@ pub enum SettingsError {
     SettingNotFuond(String),
     ValueError(String),
     ParseError(String),
+    FileNotFoundError(String),
     ReadWriteError,
 }
 
@@ -157,7 +158,7 @@ impl Settings {
         }
 
         if !driver.exists() {
-            return Err(SettingsError::ValueError(
+            return Err(SettingsError::FileNotFoundError(
                 "driver does not exists".to_owned(),
             ));
         }
@@ -245,7 +246,7 @@ impl Settings {
             return Err(SettingsError::ReadWriteError);
         }
         if !dir.exists() {
-            return Err(SettingsError::ValueError(
+            return Err(SettingsError::FileNotFoundError(
                 "working dir does not exist".to_owned(),
             ));
         }

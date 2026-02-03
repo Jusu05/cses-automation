@@ -1,5 +1,5 @@
 use crate::database::Database;
-use crate::settings::{Settings, SettingsError};
+use crate::settings::settings::{Settings, SettingsError};
 use scraper::{Html, Selector, element_ref::ElementRef};
 use std::collections::HashSet;
 use std::fs::{self, File, OpenOptions};
@@ -15,6 +15,7 @@ pub enum CsesConnectionError {
     Sql(rusqlite::Error),
     Io(std::io::Error),
     Setting(SettingsError),
+    ValueError(String),
 }
 
 impl From<thirtyfour::error::WebDriverError> for CsesConnectionError {
@@ -56,7 +57,9 @@ impl Drop for CsesConnection {
 }
 
 impl CsesConnection {
-    pub async fn new(settings: Settings, database: Database) -> Result<Self, CsesConnectionError> {
+    pub async fn new(path: &PathBuf) -> Result<Self, CsesConnectionError> {
+        let settings = Settings::new(path.join("settings.ini"));
+        let database = Database::new(path.join("tasks.db"))?;
         let webrdriver = settings.get_webdriver_path()?;
         let child = Command::new(webrdriver)
             .arg("--port")
@@ -70,7 +73,6 @@ impl CsesConnection {
         let driver = WebDriver::new("http://localhost:4444", caps).await?;
         let url = settings.get_cses_url()?;
         driver.goto(format!("{}/list/", url)).await?;
-
         Ok(Self {
             driver,
             settings,
@@ -221,6 +223,14 @@ impl CsesConnection {
     }
 
     pub async fn submit_task(&self, file: String) -> Result<(), CsesConnectionError> {
+        let task_dir = self.list_task_dir()?;
+
+        if !task_dir.contains(&file) {
+            return Err(CsesConnectionError::ValueError(
+                "Task no downloaded".to_owned(),
+            ));
+        }
+
         let id = self.database.get_id_by_file_name(&file)?;
         let week = self.database.get_week_by_file_name(&file)?;
         let dir = self.settings.get_working_dir()?;
@@ -269,5 +279,26 @@ impl CsesConnection {
         submit.click().await?;
 
         Ok(())
+    }
+
+    pub async fn task_solution_result(
+        &self,
+        task_id: &str,
+    ) -> Result<String, CsesConnectionError> {
+        let url = self.settings.get_cses_url()?;
+        self.driver.goto(format!("{}/view/{}/", url, task_id));
+        let solution = self.driver.find(By::Css( "body > div.skeleton > div.content-wrapper > div.content > table > tbody > tr > td:nth-child(4) > a")).await?;
+        solution.click();
+
+        let result = self.driver.find(By::Css("body > div.skeleton > div.content-wrapper > div.content > table > tbody > tr:nth-child(6) > td:nth-child(2) > span")).await?;
+        let mut text = result.text().await?;
+
+        if text == "TEST FAILED" {
+            let current_url = self.driver.current_url().await?.to_string();
+            let error = format!("\n find reason from: {}", &current_url);
+            text += &error;
+        }
+
+        return Ok(text);
     }
 }
