@@ -47,7 +47,7 @@ impl Tui {
                     self.help(true, false, false, false);
                     return;
                 }
-                self.handle_submit(&args[1]);
+                self.handle_submit(&args[1]).await;
                 return;
             }
             "download" => {
@@ -55,7 +55,7 @@ impl Tui {
                     self.help(false, true, false, false);
                     return;
                 }
-                self.handle_download();
+                self.handle_download().await;
                 return;
             }
             "url" => {

@@ -8,6 +8,6 @@ pub mod tui;
 #[tokio::main]
 pub async fn start(path: PathBuf) {
     if let Some(mut app) = tui::Tui::new(path) {
-        app.main_loop();
+        app.main_loop().await;
     }
 }
