@@ -5,7 +5,6 @@ mod database;
 mod settings;
 pub mod cli;
 
-#[tokio::main]
 pub async fn start(path: PathBuf) {
     if let Some(mut app) = cli::Cli::new(path) {
         app.main_loop().await;

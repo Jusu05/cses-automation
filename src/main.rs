@@ -1,7 +1,9 @@
-use cses_automation::start;
+use cses::start;
 use std::path::PathBuf;
 
-fn main() {
+
+#[tokio::main]
+async fn main() {
     let path = PathBuf::from(".");
-    start(path)
-}   
+    start(path).await;
+}

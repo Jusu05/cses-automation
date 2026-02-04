@@ -70,12 +70,12 @@ impl CsesConnection {
         let child = Command::new(webrdriver)
             .arg("--port")
             .arg("4444")
-            .arg("--headless")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()?;
 
-        let caps = DesiredCapabilities::firefox();
+        let mut caps = DesiredCapabilities::firefox();
+        caps.set_headless()?;
         let driver = WebDriver::new("http://localhost:4444", caps).await?;
         let url = settings.get_cses_url()?;
         driver.goto(format!("{}/list/", url)).await?;
