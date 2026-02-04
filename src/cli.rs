@@ -4,13 +4,13 @@ use crate::settings::settings::{Settings, SettingsError};
 use std::{env, path::PathBuf, sync::LazyLock};
 
 static DEVELOPMENT_MODE: LazyLock<bool> = LazyLock::new(|| env::var("DEVELOPMENT").is_ok());
-pub struct Tui {
+pub struct Cli {
     settings: Settings,
     database: Database,
     path: PathBuf,
     cses_connection: Option<CsesConnection>,
 }
-impl Tui {
+impl Cli {
     pub fn new(path: PathBuf) -> Option<Self> {
         let settings = Settings::new(path.join("settings.ini"));
         let database = Database::new(path.join("tasks.db"));
@@ -20,7 +20,7 @@ impl Tui {
             return None;
         }
         let database = database.unwrap();
-        Some(Tui {
+        Some(Cli {
             settings,
             database,
             path,
@@ -275,9 +275,7 @@ impl Tui {
             return;
         }
 
-        let path = PathBuf::from(&dir)
-            .join(&week.unwrap())
-            .join(&file);
+        let path = PathBuf::from(&dir).join(&week.unwrap()).join(&file);
         if !path.exists() {
             println!("your file provited does not exists");
             return;
@@ -287,7 +285,13 @@ impl Tui {
             return;
         }
 
-        if let Err(e) = self.cses_connection.as_ref().unwrap().submit_task(file).await {
+        if let Err(e) = self
+            .cses_connection
+            .as_ref()
+            .unwrap()
+            .submit_task(file)
+            .await
+        {
             match e {
                 CsesConnectionError::Setting(e) => {
                     if let SettingsError::SettingNotFuond(s) = e {
@@ -330,7 +334,12 @@ impl Tui {
             }
         }
 
-        let result = self.cses_connection.as_ref().unwrap().task_solution_result(&id).await;
+        let result = self
+            .cses_connection
+            .as_ref()
+            .unwrap()
+            .task_solution_result(&id)
+            .await;
         if let Err(e) = result {
             if *DEVELOPMENT_MODE {
                 println!("{:?}", e);
@@ -345,7 +354,7 @@ impl Tui {
             TaskStatus::NotDone
         };
 
-         if let Err(e) = self.database.set_passed_by_id(passed, &id) {
+        if let Err(e) = self.database.set_passed_by_id(passed, &id) {
             if *DEVELOPMENT_MODE {
                 println!("{:?}", e);
             }
@@ -362,7 +371,7 @@ impl Tui {
             }
             return;
         }
-        
+
         let url = self.settings.get_cses_url();
         if let Err(e) = url {
             if *DEVELOPMENT_MODE {
@@ -370,7 +379,7 @@ impl Tui {
             }
             return;
         }
-    
+
         println!("{}/task/{}", url.unwrap(), task_id.unwrap())
     }
 }
