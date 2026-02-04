@@ -115,7 +115,9 @@ impl CsesConnection {
             let content_selector = Selector::parse("div.md").unwrap();
             let content = html.select(&content_selector).next().unwrap();
 
-            if !self.task_has_file_name(content) {
+            if let Some(file_name) = self.task_has_file_name(content) {
+                self.database.set_file_name_by_id(&file_name, &task.0)?;
+            } else {
                 continue;
             }
 
@@ -152,7 +154,7 @@ impl CsesConnection {
     }
 
     async fn get_tasks(&self) -> Result<Vec<(String, String, String)>, CsesConnectionError> {
-        let loaded_tasks = self.list_task_dir()?;
+        let loaded_tasks = self.database.get_all_task_names()?;
         let url = self.settings.get_cses_url()?;
         self.driver.goto(format!("{}/list/", url)).await?;
 
@@ -161,7 +163,7 @@ impl CsesConnection {
         let h2_selector = Selector::parse("h2").unwrap();
         let li_selector = Selector::parse("li.task a").unwrap();
 
-        let mut tasks_ids: Vec<(String, String, String)> = Vec::new();
+        let mut tasks: Vec<(String, String, String)> = Vec::new();
         for (task_list, heading) in html.select(&ul_selector).zip(html.select(&h2_selector)) {
             for element in task_list.select(&li_selector) {
                 let task_name = element.text().collect::<String>();
@@ -177,12 +179,12 @@ impl CsesConnection {
                     let id = parts.last().unwrap();
                     let week = heading.text().next().unwrap().to_owned();
                     self.database.add_task(id, &task_name, &week)?;
-                    tasks_ids.push((id.to_string(), task_name, week));
+                    tasks.push((id.to_string(), task_name, week));
                 }
             }
         }
 
-        Ok(tasks_ids)
+        Ok(tasks)
     }
 
     fn list_task_dir(&self) -> Result<HashSet<String>, CsesConnectionError> {
@@ -211,15 +213,15 @@ impl CsesConnection {
         Ok(tasks)
     }
 
-    fn task_has_file_name(&self, html: ElementRef<'_>) -> bool {
+    fn task_has_file_name(&self, html: ElementRef<'_>) -> Option<String> {
         let code_selector = Selector::parse("code").unwrap();
         for code_block in html.select(&code_selector) {
             let text: String = code_block.text().collect();
             if text.ends_with(".py") {
-                return true;
+                return Some(text);
             }
         }
-        false
+        None
     }
 
     pub async fn submit_task(&self, file: String) -> Result<(), CsesConnectionError> {
@@ -286,9 +288,9 @@ impl CsesConnection {
         task_id: &str,
     ) -> Result<String, CsesConnectionError> {
         let url = self.settings.get_cses_url()?;
-        self.driver.goto(format!("{}/view/{}/", url, task_id));
+        self.driver.goto(format!("{}/view/{}/", url, task_id)).await?;
         let solution = self.driver.find(By::Css( "body > div.skeleton > div.content-wrapper > div.content > table > tbody > tr > td:nth-child(4) > a")).await?;
-        solution.click();
+        solution.click().await?;
 
         let result = self.driver.find(By::Css("body > div.skeleton > div.content-wrapper > div.content > table > tbody > tr:nth-child(6) > td:nth-child(2) > span")).await?;
         let mut text = result.text().await?;

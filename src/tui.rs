@@ -30,7 +30,6 @@ impl Tui {
 
     pub async fn main_loop(&mut self) {
         let args: Vec<String> = env::args().skip(1).collect();
-
         if args.is_empty() {
             self.help(true, true, true, true);
             return;
@@ -171,7 +170,7 @@ impl Tui {
                     }
                 }
                 "--password" => {
-                    if let Err(e) = self.settings.set_username(pair[1]) {
+                    if let Err(e) = self.settings.set_password(pair[1]) {
                         if *DEVELOPMENT_MODE {
                             println!("{:?}", e);
                         }
@@ -288,7 +287,7 @@ impl Tui {
             return;
         }
 
-        if let Err(e) = self.cses_connection.as_ref().unwrap().load_task().await {
+        if let Err(e) = self.cses_connection.as_ref().unwrap().submit_task(file).await {
             match e {
                 CsesConnectionError::Setting(e) => {
                     if let SettingsError::SettingNotFuond(s) = e {
@@ -346,7 +345,12 @@ impl Tui {
             TaskStatus::NotDone
         };
 
-        self.database.set_passed_by_id(passed, &id);
+         if let Err(e) = self.database.set_passed_by_id(passed, &id) {
+            if *DEVELOPMENT_MODE {
+                println!("{:?}", e);
+            }
+            return;
+        };
         println!("{}", s);
     }
 
