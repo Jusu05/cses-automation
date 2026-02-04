@@ -293,6 +293,7 @@ impl CsesConnection {
         &self,
         task_id: &i32,
     ) -> Result<String, CsesConnectionError> {
+        self.login().await?;
         let url = self.settings.get_cses_url()?;
         self.driver.goto(format!("{}/view/{}/", url, task_id)).await?;
         let solution = self.driver.find(By::Css( "body > div.skeleton > div.content-wrapper > div.content > table > tbody > tr > td:nth-child(4) > a")).await?;

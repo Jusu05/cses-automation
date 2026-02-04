@@ -371,6 +371,6 @@ impl Tui {
             return;
         }
     
-        println!("{}/view/{}", url.unwrap(), task_id.unwrap())
+        println!("{}/task/{}", url.unwrap(), task_id.unwrap())
     }
 }
