@@ -36,6 +36,12 @@ impl From<std::io::Error> for CsesConnectionError {
     }
 }
 
+impl From<std::num::ParseIntError> for CsesConnectionError {
+    fn from(err: std::num::ParseIntError) -> Self {
+        CsesConnectionError::ValueError(format!("{:?}", err))
+    }
+}
+
 impl From<SettingsError> for CsesConnectionError {
     fn from(err: SettingsError) -> Self {
         CsesConnectionError::Setting(err)
@@ -153,7 +159,7 @@ impl CsesConnection {
         Ok(())
     }
 
-    async fn get_tasks(&self) -> Result<Vec<(String, String, String)>, CsesConnectionError> {
+    async fn get_tasks(&self) -> Result<Vec<(i32, String, String)>, CsesConnectionError> {
         let loaded_tasks = self.database.get_all_task_names()?;
         let url = self.settings.get_cses_url()?;
         self.driver.goto(format!("{}/list/", url)).await?;
@@ -163,7 +169,7 @@ impl CsesConnection {
         let h2_selector = Selector::parse("h2").unwrap();
         let li_selector = Selector::parse("li.task a").unwrap();
 
-        let mut tasks: Vec<(String, String, String)> = Vec::new();
+        let mut tasks: Vec<(i32, String, String)> = Vec::new();
         for (task_list, heading) in html.select(&ul_selector).zip(html.select(&h2_selector)) {
             for element in task_list.select(&li_selector) {
                 let task_name = element.text().collect::<String>();
@@ -176,10 +182,10 @@ impl CsesConnection {
 
                 if let Some(link) = link {
                     let parts: Vec<&str> = link.split("/").collect();
-                    let id = parts.last().unwrap();
-                    let week = heading.text().next().unwrap().to_owned();
-                    self.database.add_task(id, &task_name, &week)?;
-                    tasks.push((id.to_string(), task_name, week));
+                    let id: i32 = parts.last().unwrap().parse()?;
+                    let week: String = heading.text().next().unwrap().to_owned();
+                    self.database.add_task(&id, &task_name, &week)?;
+                    tasks.push((id, task_name, week));
                 }
             }
         }
@@ -285,7 +291,7 @@ impl CsesConnection {
 
     pub async fn task_solution_result(
         &self,
-        task_id: &str,
+        task_id: &i32,
     ) -> Result<String, CsesConnectionError> {
         let url = self.settings.get_cses_url()?;
         self.driver.goto(format!("{}/view/{}/", url, task_id)).await?;

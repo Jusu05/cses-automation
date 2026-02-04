@@ -1,4 +1,4 @@
-use rusqlite::Connection;
+use rusqlite::{Connection, params};
 use std::collections::HashSet;
 use std::convert::From;
 use std::path::PathBuf;
@@ -9,8 +9,8 @@ pub enum TaskStatus {
     Failed = 2,
 }
 
-impl From<u8> for TaskStatus {
-    fn from(value: u8) -> Self {
+impl From<i32> for TaskStatus {
+    fn from(value: i32) -> Self {
         match value {
             0 => TaskStatus::NotDone,
             1 => TaskStatus::Passed,
@@ -49,18 +49,17 @@ impl Database {
         Ok(Database { file })
     }
 
-    pub fn add_task(&self, task_id: &str, task_name: &str, week: &str) -> rusqlite::Result<()> {
+    pub fn add_task(&self, task_id: &i32, task_name: &str, week: &str) -> rusqlite::Result<()> {
         let conn = Connection::open(&self.file)?;
-        let id: i32 = task_id.parse().unwrap();
 
         conn.execute(
             "INSERT INTO tasks (id, task_name) VALUES (?1,?2);",
-            (id, task_name),
+            params![task_id, task_name],
         )?;
 
         conn.execute(
             "INSERT INTO weeks (week, task_id) VALUES (?1,?2);",
-            (week, id),
+            params![week, task_id],
         )?;
 
         Ok(())
@@ -68,19 +67,19 @@ impl Database {
 
     pub fn get_passed_by_id(&self, task_id: &i32) -> rusqlite::Result<TaskStatus> {
         let conn = Connection::open(&self.file)?;
-        let passed: u8 = conn.query_row(
+        let passed: i32 = conn.query_row(
             "SELECT passed FROM tasks WHERE id = ?1;",
-            (task_id,),
+            params![task_id],
             |row| row.get(0),
         )?;
         Ok(passed.into())
     }
 
-    pub fn get_id_by_file_name(&self, file_name: &str) -> rusqlite::Result<String> {
+    pub fn get_id_by_file_name(&self, file_name: &str) -> rusqlite::Result<i32> {
         let conn = Connection::open(&self.file)?;
-        let id: String = conn.query_row(
+        let id: i32 = conn.query_row(
             "SELECT id FROM tasks WHERE file_name = ?1;",
-            (file_name,),
+            params![file_name],
             |row| row.get(0),
         )?;
         Ok(id)
@@ -90,7 +89,7 @@ impl Database {
         let conn = Connection::open(&self.file)?;
         let week: String = conn.query_row(
             "SELECT w.week FROM tasks AS t JOIN weeks AS w ON t.id = w.task_id WHERE t.file_name = ?1;",
-            (file_name,),
+            params![file_name],
             |row| row.get(0)
         )?;
         Ok(week)
@@ -114,23 +113,21 @@ impl Database {
         Ok(weeks)
     }
 
-    pub fn set_passed_by_id(&self, passed: TaskStatus, task_id: &str) -> rusqlite::Result<()> {
+    pub fn set_passed_by_id(&self, passed: TaskStatus, task_id: &i32) -> rusqlite::Result<()> {
         let conn = Connection::open(&self.file)?;
-        let id: i32 = task_id.parse().unwrap();
         conn.execute(
             "UPDATE tasks set passed = ?1 WHERE id = ?2;",
-            (passed as u8, id),
+            params![passed as i32, task_id],
         )?;
 
         Ok(())
     }
 
-    pub fn set_file_name_by_id(&self, file_name: &str, task_id: &str) -> rusqlite::Result<()> {
+    pub fn set_file_name_by_id(&self, file_name: &str, task_id: &i32) -> rusqlite::Result<()> {
         let conn = Connection::open(&self.file)?;
-        let id: i32 = task_id.parse().unwrap();
         conn.execute(
             "UPDATE tasks set file_name = ?1 WHERE id = ?2;",
-            (file_name, id),
+            params![file_name, task_id],
         )?;
         Ok(())
     }
