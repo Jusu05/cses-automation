@@ -55,13 +55,6 @@ pub struct CsesConnection {
     child: std::process::Child,
 }
 
-impl Drop for CsesConnection {
-    fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
-    }
-}
-
 impl CsesConnection {
     pub async fn new(path: &PathBuf) -> Result<Self, CsesConnectionError> {
         let settings = Settings::new(path.join("settings.ini"));
@@ -86,7 +79,12 @@ impl CsesConnection {
             child,
         })
     }
-
+    
+    pub fn close(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+    
     async fn login(&self) -> Result<(), CsesConnectionError> {
         let url = self.settings.get_cses_url()?;
         self.driver.goto(format!("{}/list/", url)).await?;
@@ -110,7 +108,7 @@ impl CsesConnection {
         Ok(())
     }
 
-    pub async fn load_task(&self) -> Result<(), CsesConnectionError> {
+    pub async fn load_tasks(&self) -> Result<(), CsesConnectionError> {
         let tasks = self.get_tasks().await?;
 
         for task in tasks {
@@ -174,7 +172,7 @@ impl CsesConnection {
             for element in task_list.select(&li_selector) {
                 let task_name = element.text().collect::<String>();
 
-                if !loaded_tasks.contains(&task_name) {
+                if loaded_tasks.contains(&task_name) {
                     continue;
                 }
 

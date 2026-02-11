@@ -4,12 +4,14 @@ use crate::settings::settings::{Settings, SettingsError};
 use std::{env, path::PathBuf, sync::LazyLock};
 
 static DEVELOPMENT_MODE: LazyLock<bool> = LazyLock::new(|| env::var("DEVELOPMENT").is_ok());
+
 pub struct Cli {
     settings: Settings,
     database: Database,
     path: PathBuf,
     cses_connection: Option<CsesConnection>,
 }
+
 impl Cli {
     pub fn new(path: PathBuf) -> Option<Self> {
         let settings = Settings::new(path.join("settings.ini"));
@@ -75,6 +77,9 @@ impl Cli {
             _ => {
                 self.help(true, true, true, true);
             }
+        }
+        if let Some(connection) = self.cses_connection.as_mut() {
+            connection.close();
         }
     }
 
@@ -202,11 +207,12 @@ impl Cli {
 
     async fn handle_download(&mut self) {
         if let None = self.create_csec_connection().await {
+            println!("cannot connect to cses website");
             return;
         }
 
         if let Err(CsesConnectionError::Setting(e)) =
-            self.cses_connection.as_ref().unwrap().load_task().await
+            self.cses_connection.as_ref().unwrap().load_tasks().await
         {
             if let SettingsError::SettingNotFuond(s) = e {
                 match s.as_str() {
@@ -232,6 +238,10 @@ impl Cli {
                     println!("{:?}", e);
                 }
             }
+        }
+
+        if let Some(conection) = self.cses_connection.as_mut() {
+            conection.close();
         }
     }
 
@@ -282,6 +292,7 @@ impl Cli {
         }
 
         if let None = self.create_csec_connection().await {
+            println!("cannot connect to cses website");
             return;
         }
 
@@ -361,6 +372,10 @@ impl Cli {
             return;
         };
         println!("{}", s);
+
+        if let Some(conection) = self.cses_connection.as_mut() {
+            conection.close();
+        }
     }
 
     fn handle_url(&self, file: &str) {
