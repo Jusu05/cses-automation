@@ -239,7 +239,7 @@ impl CsesConnection {
 
         if !skip {
             for (i, line) in lines.iter().enumerate() {
-                if line.is_empty() {
+                if line.contains("#--------------------------------------------------") {
                     lines = lines[i + 1..].to_vec();
                     break;
                 }
@@ -257,31 +257,30 @@ impl CsesConnection {
         let url = self.settings.get_cses_url()?;
 
         self.driver.goto(format!("{}/submit/{}", url, id)).await?;
-        thread::sleep(Duration::from_millis(500));
+        // thread::sleep(Duration::from_millis(500));
         let upload = self.driver.find(By::Name("file")).await?;
-        thread::sleep(Duration::from_millis(500));
+        // thread::sleep(Duration::from_millis(500));
         let s = path.to_str().unwrap();
         upload.send_keys(s).await?;
-        thread::sleep(Duration::from_millis(500));
+        // thread::sleep(Duration::from_millis(500));
         let submit = self
             .driver
             .find(By::Css(
                 ".content > form:nth-child(1) > p:nth-child(6) > input:nth-child(1)",
             ))
             .await?;
-        thread::sleep(Duration::from_millis(500));
+        // thread::sleep(Duration::from_millis(500));
         submit.click().await?;
 
         Ok(())
     }
 
-    pub async fn task_solution_result(
-        &self,
-        task_id: &i32,
-    ) -> Result<String, CsesConnectionError> {
+    pub async fn task_solution_result(&self, task_id: &i32) -> Result<String, CsesConnectionError> {
         self.login().await?;
         let url = self.settings.get_cses_url()?;
-        self.driver.goto(format!("{}/view/{}/", url, task_id)).await?;
+        self.driver
+            .goto(format!("{}/view/{}/", url, task_id))
+            .await?;
         let solution = self.driver.find(By::Css( "body > div.skeleton > div.content-wrapper > div.content > table > tbody > tr > td:nth-child(4) > a")).await?;
         solution.click().await?;
 
