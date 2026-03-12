@@ -28,22 +28,19 @@ impl Database {
     pub fn new(file: PathBuf) -> rusqlite::Result<Self> {
         if !file.exists() {
             let conn = Connection::open(&file)?;
-            conn.execute_batch(
-                "
-            BEGIN;
+            conn.execute_batch("
             CREATE TABLE tasks (
-                    id        INTEGER PRIMARY KEY,
-                    file_name TEXT,
-                    task_name INTEGER NOT NULL,
-                    passed    INTEGER DEFAULT 0,
-                );
-                CREATE TABLE weeks (
-                    id INTEGER PRIMARY KEY AUTO_INCREMENT,
-                    week TEXT NOT NULL,
-                    task_id INTEGER,
-                    FOREIGN KEY (task_id) REFERENCES tasks(id)
-                );
-                COMMIT;",
+                id INTEGER PRIMARY KEY,
+                file_name TEXT,
+                task_name TEXT NOT NULL,
+                passed INTEGER DEFAULT 0
+            );
+            CREATE TABLE weeks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                week TEXT NOT NULL,
+                task_id INTEGER,
+                FOREIGN KEY (task_id) REFERENCES tasks(id)
+            );",
             )?;
         }
         Ok(Database { file })
@@ -58,8 +55,8 @@ impl Database {
         )?;
 
         conn.execute(
-            "INSERT INTO weeks (week, task_id) VALUES (?1,?2);",
-            params![week, task_id],
+            "INSERT INTO weeks (task_id, week) VALUES (?1,?2);",
+            params![task_id, week],
         )?;
 
         Ok(())
