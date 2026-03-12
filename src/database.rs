@@ -28,7 +28,8 @@ impl Database {
     pub fn new(file: PathBuf) -> rusqlite::Result<Self> {
         if !file.exists() {
             let conn = Connection::open(&file)?;
-            conn.execute_batch("
+            conn.execute_batch(
+                "
             CREATE TABLE tasks (
                 id INTEGER PRIMARY KEY,
                 file_name TEXT,

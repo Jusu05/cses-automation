@@ -1,6 +1,5 @@
-use cses_automation::start;
+use cses::start;
 use std::path::PathBuf;
-
 
 #[tokio::main]
 async fn main() {

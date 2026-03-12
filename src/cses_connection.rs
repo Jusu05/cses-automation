@@ -2,11 +2,10 @@ use crate::database::Database;
 use crate::settings::settings::{Settings, SettingsError};
 use scraper::{Html, Selector, element_ref::ElementRef};
 use std::collections::HashSet;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File, OpenOptions, create_dir_all};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::{thread, time::Duration};
 use thirtyfour::prelude::*;
 
 #[derive(Debug)]
@@ -79,12 +78,12 @@ impl CsesConnection {
             child,
         })
     }
-    
+
     pub fn close(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
-    
+
     async fn login(&self) -> Result<(), CsesConnectionError> {
         let url = self.settings.get_cses_url()?;
         self.driver.goto(format!("{}/list/", url)).await?;
@@ -110,7 +109,6 @@ impl CsesConnection {
 
     pub async fn load_tasks(&self) -> Result<(), CsesConnectionError> {
         let tasks = self.get_tasks().await?;
-
         for task in tasks {
             let url = self.settings.get_cses_url()?;
             self.driver.goto(format!("{}/task/{}", url, task.0)).await?;
@@ -118,39 +116,29 @@ impl CsesConnection {
             let html = Html::parse_document(&page_source);
             let content_selector = Selector::parse("div.md").unwrap();
             let content = html.select(&content_selector).next().unwrap();
-
-            if let Some(file_name) = self.task_has_file_name(content) {
+            let file_name = self.task_has_file_name(content);
+            if let Some(file_name) = &file_name {
                 self.database.set_file_name_by_id(&file_name, &task.0)?;
             } else {
                 continue;
             }
-
-            let code_selector =
-                Selector::parse("pre.resize-horizontal prettyprint lang-python prettyprinted")
-                    .unwrap();
-
-            let code_elment = content.select(&code_selector).next();
-            let code = if let Some(code_element) = code_elment {
-                code_element.text().next()
-            } else {
-                None
-            };
-
             let dir = self.settings.get_working_dir()?;
-            let path = PathBuf::from(dir).join(task.2).join(task.1);
-            let mut file = File::create(path)?;
-            for child in content.child_elements() {
-                if let Some(code_elment) = code_elment {
-                    if code_elment == child {
-                        continue;
-                    }
-                }
-                let s = child.text().collect::<String>();
-                writeln!(file, "#{}", s)?;
+            let path = PathBuf::from(dir).join(task.2);
+            if !path.exists() {
+                create_dir_all(&path)?;
             }
-
-            if let Some(code) = code {
-                writeln!(file, "{}", code)?;
+            let file_path = path.join(file_name.unwrap());
+            let mut file = File::create(file_path)?;
+            for child in content.child_elements() {
+                let text = child.text().collect::<String>();
+                if text.starts_with("def") || text.starts_with("class") {
+                    writeln!(file,"#--------------------------------------------------")?;
+                    writeln!(file,"{text}")?;
+                } else if text.starts_with(" ") || text.starts_with("if") {
+                    writeln!(file,"{text}")?;
+                } else {
+                    writeln!(file, "#{text}")?;
+                }
             }
         }
 
