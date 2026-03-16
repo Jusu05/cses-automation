@@ -90,20 +90,20 @@ impl Cli {
             helptext += "list of commands:\n";
         }
         if submit {
-            helptext += "submit <file> - file name that will be submited\n";
+            helptext += "submit <file> - file name that will be submitted\n";
         }
         if url {
-            helptext += "url <file> - file name that shows execise page\n";
+            helptext += "url <file> - file name that shows excise page\n";
         }
         if download {
             helptext += "download - downloads all not yet downloaded excises\n";
         }
         if settings {
-            helptext += "settings <argumets...> - settings for program\n\n";
-            helptext += "    list of argumets\n";
+            helptext += "settings <arguments...> - settings for program\n\n";
+            helptext += "    list of arguments\n";
             helptext += "    --webdriver <driver> - set path to browser webdriver\n";
             helptext += "    --url <url> - set url to cses website\n";
-            helptext += "    --dir <path> - set dirrectory where files will be downloaded\n";
+            helptext += "    --dir <path> - set directory where files will be downloaded\n";
             helptext += "    --username <username> - set mooc username\n";
             helptext += "    --password <password> - set mooc password";
         }
@@ -118,7 +118,7 @@ impl Cli {
                     if let Err(e) = self.settings.set_webdriver_path(&webdriver) {
                         match e {
                             SettingsError::ReadWriteError => {
-                                println!("Can't read settigs file");
+                                println!("Can't read settings file");
                             }
                             SettingsError::ValueError(_) => {
                                 println!("only supported driver is firefox geckodriver");
@@ -188,11 +188,11 @@ impl Cli {
         }
     }
 
-    async fn create_csec_connection(&mut self) -> Option<()> {
+    async fn create_cses_connection(&mut self) -> Option<()> {
         if self.cses_connection.is_none() {
             match CsesConnection::new(&self.path).await {
-                Ok(connnction) => {
-                    self.cses_connection = Some(connnction);
+                Ok(connection) => {
+                    self.cses_connection = Some(connection);
                 }
                 Err(e) => {
                     if *DEVELOPMENT_MODE {
@@ -206,7 +206,7 @@ impl Cli {
     }
 
     async fn handle_download(&mut self) {
-        if let None = self.create_csec_connection().await {
+        if let None = self.create_cses_connection().await {
             println!("cannot connect to cses website");
             return;
         }
@@ -214,22 +214,22 @@ impl Cli {
         if let Err(CsesConnectionError::Setting(e)) =
             self.cses_connection.as_ref().unwrap().load_tasks().await
         {
-            if let SettingsError::SettingNotFuond(s) = e {
+            if let SettingsError::SettingNotFound(s) = e {
                 match s.as_str() {
                     "webdriver is not firefox's geckodriver" => {
-                        println!("Webdriver path need to spefied by settings --webdriver")
+                        println!("Webdriver path need to specified by settings --webdriver")
                     }
                     "working directory is not defined" => {
-                        println!("Working dir need to spefied by settings --dir")
+                        println!("Working dir need to specified by settings --dir")
                     }
                     "Setting cses url is not set" => {
-                        println!("Url need to spefied by settings --url")
+                        println!("Url need to specified by settings --url")
                     }
                     "Setting username is not set" => {
-                        println!("Username need to spefied by settings --username")
+                        println!("Username need to specified by settings --username")
                     }
-                    "password is not spefied" => {
-                        println!("Password need to spefied by settings --password")
+                    "password is not specified" => {
+                        println!("Password need to specified by settings --password")
                     }
                     _ => {}
                 }
@@ -240,8 +240,8 @@ impl Cli {
             }
         }
 
-        if let Some(conection) = self.cses_connection.as_mut() {
-            conection.close();
+        if let Some(connection) = self.cses_connection.as_mut() {
+            connection.close();
         }
     }
 
@@ -257,8 +257,8 @@ impl Cli {
         let workdir = self.settings.get_working_dir();
 
         if workdir.is_err() {
-            if let Err(SettingsError::SettingNotFuond(_)) = workdir {
-                println!("Webdriver path need to spefied by settings --webdriver")
+            if let Err(SettingsError::SettingNotFound(_)) = workdir {
+                println!("Webdriver path need to specified by settings --webdriver")
             } else {
                 if *DEVELOPMENT_MODE {
                     println!("{:?}", workdir);
@@ -287,11 +287,11 @@ impl Cli {
 
         let path = PathBuf::from(&dir).join(&week.unwrap()).join(&file);
         if !path.exists() {
-            println!("your file provited does not exists");
+            println!("your file provided does not exists");
             return;
         }
 
-        if let None = self.create_csec_connection().await {
+        if let None = self.create_cses_connection().await {
             println!("cannot connect to cses website");
             return;
         }
@@ -305,22 +305,22 @@ impl Cli {
         {
             match e {
                 CsesConnectionError::Setting(e) => {
-                    if let SettingsError::SettingNotFuond(s) = e {
+                    if let SettingsError::SettingNotFound(s) = e {
                         match s.as_str() {
                             "webdriver is not firefox's geckodriver" => {
-                                println!("Webdriver path need to spefied by settings --webdriver")
+                                println!("Webdriver path need to specified by settings --webdriver")
                             }
                             "working directory is not defined" => {
-                                println!("Working dir need to spefied by settings --dir")
+                                println!("Working dir need to specified by settings --dir")
                             }
                             "Setting cses url is not set" => {
-                                println!("Url need to spefied by settings --url")
+                                println!("Url need to specified by settings --url")
                             }
                             "Setting username is not set" => {
-                                println!("Username need to spefied by settings --username")
+                                println!("Username need to specified by settings --username")
                             }
-                            "password is not spefied" => {
-                                println!("Password need to spefied by settings --password")
+                            "password is not specified" => {
+                                println!("Password need to specified by settings --password")
                             }
                             _ => {}
                         }
@@ -333,7 +333,7 @@ impl Cli {
                 }
                 CsesConnectionError::ValueError(_) => {
                     println!("Nothing can be submitted");
-                    println!("Execices nedd to be downloaded");
+                    println!("Exercises need to be downloaded");
                     return;
                 }
                 _ => {
@@ -373,8 +373,8 @@ impl Cli {
         };
         println!("{}", s);
 
-        if let Some(conection) = self.cses_connection.as_mut() {
-            conection.close();
+        if let Some(connection) = self.cses_connection.as_mut() {
+            connection.close();
         }
     }
 

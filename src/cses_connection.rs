@@ -165,7 +165,6 @@ impl CsesConnection {
                 }
 
                 let link = element.value().attr("href");
-
                 if let Some(link) = link {
                     let parts: Vec<&str> = link.split("/").collect();
                     let id: i32 = parts.last().unwrap().parse()?;

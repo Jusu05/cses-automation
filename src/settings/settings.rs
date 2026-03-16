@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 #[derive(Debug)]
 pub enum SettingsError {
-    SettingNotFuond(String),
+    SettingNotFound(String),
     ValueError(String),
     ParseError(String),
     FileNotFoundError(String),
@@ -34,14 +34,14 @@ impl Settings {
         match config.get("general", "webdriver") {
             Some(s) => {
                 if s.is_empty() {
-                    return Err(SettingsError::SettingNotFuond(
+                    return Err(SettingsError::SettingNotFound(
                         "Setting webriver is not set".to_owned(),
                     ));
                 }
 
                 Ok(s)
             }
-            None => Err(SettingsError::SettingNotFuond(
+            None => Err(SettingsError::SettingNotFound(
                 "Setting webriver is not set".to_owned(),
             )),
         }
@@ -56,13 +56,13 @@ impl Settings {
         match config.get("general", "cses_url") {
             Some(s) => {
                 if s.is_empty() {
-                    return Err(SettingsError::SettingNotFuond(
+                    return Err(SettingsError::SettingNotFound(
                         "Setting cses url is not set".to_owned(),
                     ));
                 }
                 Ok(s)
             }
-            None => Err(SettingsError::SettingNotFuond(
+            None => Err(SettingsError::SettingNotFound(
                 "Setting cses url is not set".to_owned(),
             )),
         }
@@ -79,14 +79,14 @@ impl Settings {
         match config.get("user", "username") {
             Some(s) => {
                 if s.is_empty() {
-                    return Err(SettingsError::SettingNotFuond(
+                    return Err(SettingsError::SettingNotFound(
                         "Setting username is not set".to_owned(),
                     ));
                 }
                 username.push_str(&s);
             }
             None => {
-                return Err(SettingsError::SettingNotFuond(
+                return Err(SettingsError::SettingNotFound(
                     "Setting username is not set".to_owned(),
                 ));
             }
@@ -96,14 +96,14 @@ impl Settings {
         match config.get("user", "password") {
             Some(hex) => {
                 if hex.is_empty() {
-                    return Err(SettingsError::SettingNotFuond(
+                    return Err(SettingsError::SettingNotFound(
                         "Setting password is not set".to_owned(),
                     ));
                 }
                 password.push_str(&self.hex_to_string(&hex)?);
             }
             None => {
-                return Err(SettingsError::SettingNotFuond(
+                return Err(SettingsError::SettingNotFound(
                     "Setting password is not set".to_owned(),
                 ));
             }
@@ -138,13 +138,13 @@ impl Settings {
         match config.get("system", "working_dir") {
             Some(s) => {
                 if s.is_empty() {
-                    return Err(SettingsError::SettingNotFuond(
+                    return Err(SettingsError::SettingNotFound(
                         "Setting working dir is not set".to_owned(),
                     ));
                 }
                 Ok(s)
             }
-            None => Err(SettingsError::SettingNotFuond(
+            None => Err(SettingsError::SettingNotFound(
                 "Setting working dir is not set".to_owned(),
             )),
         }
