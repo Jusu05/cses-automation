@@ -1,4 +1,4 @@
-use cses::start;
+use cses_automation::start;
 use std::path::PathBuf;
 
 #[tokio::main]

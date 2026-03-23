@@ -1,7 +1,7 @@
 
 # CSES Automation
 
-This project is comandlinetool for submissions and problem fetching Helsinki University cses courses. Its writen in rust and uses browser automation to interact with cses website and curently supports only firefox and geckoriver.
+This project is commandlinetool for submissions and problem fetching Helsinki University cses courses. Its writen in rust and uses browser automation to interact with cses website and curently supports only firefox and geckoriver.
 
 
 ## Installation
@@ -16,7 +16,8 @@ To run program also Firfox and it's webdriver Geckodriver need to be installed.
 ## Running
 Before usign commands 'submit' or 'download' all settings need to be set
 ```bash
-cargo run <command>
+cargo build -r #build binary
+target/release/cses-automation <command> #run binary
 
 # list of commands:
 # submit <file> - file name that will be submited

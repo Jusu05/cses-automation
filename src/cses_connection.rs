@@ -132,10 +132,10 @@ impl CsesConnection {
             for child in content.child_elements() {
                 let text = child.text().collect::<String>();
                 if text.starts_with("def") || text.starts_with("class") {
-                    writeln!(file,"#--------------------------------------------------")?;
-                    writeln!(file,"{text}")?;
+                    writeln!(file, "#--------------------------------------------------")?;
+                    writeln!(file, "{text}")?;
                 } else if text.starts_with(" ") || text.starts_with("if") {
-                    writeln!(file,"{text}")?;
+                    writeln!(file, "{text}")?;
                 } else {
                     writeln!(file, "#{text}")?;
                 }
